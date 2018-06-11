@@ -144,68 +144,42 @@ class Agent:
 		X_batch_s2 = np.vstack(s2)
 		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
 
-		X_batch_s3 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
-		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
-		r2 = np.zeros(batch_size, dtype=np.float)
-		d2 = np.zeros(batch_size, dtype=np.float)
-		for k in range(batch_size):
-			k_id = i1[k]
-			mem = None
-			try:
-				mem  = self.get_state_byid(k_id+1)
-			except KeyError, e:
-				print 'I got a KeyError - reason "%s"' % str(e)
+		NN = 3
+		X_batch_s3 = np.zeros(NN*batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
+		X_batch_s3 = np.asarray(X_batch_s3).reshape(NN, batch_size, STATE_DXY, STATE_DXY)
+		r2 = np.zeros(NN*batch_size, dtype=np.float)
+		d2 = np.zeros(NN*batch_size, dtype=np.float)
+		t2 = np.zeros(NN*batch_size, dtype=np.float)
+		r2 = np.asarray(r2).reshape(NN, batch_size)
+		d2 = np.asarray(d2).reshape(NN, batch_size)
+		t2 = np.asarray(t2).reshape(NN, batch_size)
+		for i in range(1, NN):
+			for k in range(batch_size):
+				k_id = i1[k]
 				mem = None
-			if mem != None:
-				#print "X_batch_s3::mem", mem[2], mem[4] * 1.
-				X_batch_s3[k] = mem[3]
-				d2[k] = mem[4] * 1.
-				r2[k] = mem[2]
-			else:
-				#print "X_batch_s3::mem == None"
-				d2[k] = 1 * 1.
-				r2[k] = -100.0
-		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+				try:
+					mem  = self.get_state_byid(k_id+i)
+				except KeyError, e:
+					print 'I got a KeyError - reason "%s"' % str(e)
+					mem = None
+				if mem != None:
+					X_batch_s3[i][k] = mem[3]
+					d2[i][k] = mem[4] * 1.
+					r2[i][k] = mem[2]
+					t2[i][k] = mem[6]
+				else:
+					d2[i][k] = 1 * 1.
+					r2[i][k] = -100.0
+					t2[i][k] = 0.0
 
-		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
-		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
-		r3 = np.zeros(batch_size, dtype=np.float)
-		d3 = np.zeros(batch_size, dtype=np.float)
-		t3 = np.zeros(batch_size, dtype=np.float)
-		for k in range(batch_size):
-			k_id = i1[k]
-			mem = None
-			try:
-				mem  = self.get_state_byid(k_id+2)
-			except KeyError, e:
-				print 'I got a KeyError - reason "%s"' % str(e)
-				mem = None
-			#print "mem:", mem
-			if mem != None:
-				#print "X_batch_s4::mem", mem[2], mem[4] * 1.
-				X_batch_s4[k] = mem[3]
-				d3[k] = mem[4] * 1.
-				r3[k] = mem[2]
-				t3[k] = mem[6]
-			else:
-				#print "X_batch_s4::mem == None"
-				d3[k] = 1 * 1.
-				r3[k] = -100.0
-				t3[k] = 0.0
-		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
-		X_extra_s4 = np.vstack(t3)
-		X_extra_s4 = np.asarray(X_extra_s4).reshape(batch_size, 1)
-		#print "X_batch_s3:", X_batch_s3[0]
-
-		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
-		#y_batch[np.arange(batch_size), a1] = r1 + self.gamma * np.max(self.predict_batch(X_batch_s2), 1) * (1 - d1)
-		#print r1[0], self.gamma*r2[0], self.gamma*r2[0]*(1 - d1[0])*(1 - d2[0]),  self.gamma * self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d2) * (1 - d1))[0] 
+		X_batch_s3 = np.asarray(X_batch_s3[NN-1]).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		X_extra_s3 = np.vstack(t2[NN-1])
+		X_extra_s3 = np.asarray(X_extra_s3).reshape(batch_size, 1)
 		y_batch[np.arange(batch_size), a1] = \
-				r1 + \
-				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
-				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
-				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4, X_extra_s4), 1) * (1-d2) * (1-d1)*(1-d3)
-
+			r1 + \
+			self.gamma*r2[1]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
 
 		return X_batch, X_extra, y_batch
 
