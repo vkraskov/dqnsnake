@@ -23,7 +23,6 @@ EPISODES = 100001
 BATCH_SIZE = 96
 MAX_STEPS = 1000
 ACTION_SIZE = 4
-DQN_MEMSIZE = MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
 
 key2str = { KEY_UP: "up", KEY_DOWN: "down", KEY_RIGHT: "right", KEY_LEFT: "left" }
 action2str = { ACT_FORWARD: "forward", ACT_BACK: "back", ACT_RIGHT: "right", ACT_LEFT: "left" }
@@ -104,7 +103,7 @@ if __name__ == "__main__":
 	game = game.Game(AREA_WIDTH, AREA_HEIGHT)
 	user_play(game)
 
-	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE)
+	agent = agent.Agent(ACTION_SIZE, MAX_STEPS)
 
 	stats = stats.Stats(BUILD_NAME)
 
@@ -127,6 +126,7 @@ if __name__ == "__main__":
 				msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
 					.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
 				print msg_str
+				print agent.act_values
 			#	print "----------------"
 			#	game.render_dxy_state()
 			#	print "----------------"
@@ -142,7 +142,7 @@ if __name__ == "__main__":
 			#	game.render_dxy_state()
 			#	print "----------------"
 			#	time.sleep(0.15)
-			reward = reward if not game.done else -100.0
+			reward = reward if not game.done else -1.0
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward

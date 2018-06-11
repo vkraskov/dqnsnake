@@ -24,14 +24,14 @@ STATE_CLIP_DXY = STATE_DXY/4
 ############
 
 class Agent:
-	def __init__(self, action_size, dqnmem_size):
+	def __init__(self, action_size, maxsteps):
 		self.state_size = STATE_SIZE
+		self.maxsteps = maxsteps
 		self.action_size = action_size
-		self.dqnmem_size = dqnmem_size
 		self.sdict = {}
-		self.memory = deque(maxlen=dqnmem_size)
-		self.memory_fail = deque(maxlen=dqnmem_size)
-		self.memory_good = deque(maxlen=dqnmem_size)
+		self.memory = deque(maxlen=self.maxsteps*4)
+		self.memory_fail = deque(maxlen=self.maxsteps)
+		self.memory_good = deque(maxlen=self.maxsteps)
 		self.gamma = 0.95    # discount rate
 		self.epsilon = 1.0  # exploration rate
 		self.epsilon_min = 0.001
@@ -39,6 +39,7 @@ class Agent:
 		self.learning_rate = 0.001
 		self.model = self._build_model()
 		self.mem_seq_id = 0
+		self.act_values = None
 
 	def _build_model(self):
 		# https://github.com/fchollet/keras/issues/1860
@@ -72,6 +73,10 @@ class Agent:
 	def remember(self, state, action, reward, next_state, done):
 		rec = [state, action, reward, next_state, done, self.mem_seq_id]
 		self.sdict[self.mem_seq_id] = rec
+		# removing records older mem fail mem size multiplied by maxsteps in episode
+		delidx = self.mem_seq_id-(self.maxsteps*self.maxsteps)
+		if delidx >= 0:
+			del self.sdict[delidx]
 		self.memory.append(rec)
 		if done:
 			self.memory_fail.append(rec)
@@ -89,10 +94,10 @@ class Agent:
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
-		act_values = self.model.predict([np_state, np_state_clip])
+		self.act_values = self.model.predict([np_state, np_state_clip])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
-		return np.argmax(act_values[0])  # returns action
+		return np.argmax(self.act_values[0])  # returns action
 
 	def train_batch(self, X_batch, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
@@ -121,70 +126,74 @@ class Agent:
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
 		y_batch = self.predict_batch(X_batch)
 
-		X_batch_s2 = np.vstack(s2)
-		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
-
-		X_batch_s3 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
-		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
-		r2 = np.zeros(batch_size, dtype=np.float)
-		d2 = np.zeros(batch_size, dtype=np.float)
-		for k in range(batch_size):
-			if d1[k] == 1: 
-				d2[k] = 1.
-				r2[k] = -100.0
-			else:
-				k_id = i1[k]
-				try:
-					mem  = self.get_state_byid(k_id+1)
-				except KeyError, e:
-					mem = None
-					print 'I got a KeyError - reason "%s"' % str(e)
-					d2[k] = 0.0
-					r2[k] = 0.0
-				if mem != None:
-					#print "X_batch_s3::mem", mem[2], mem[4] * 1.
-					X_batch_s3[k] = mem[3]
-					d2[k] = mem[4] * 1.
-					r2[k] = mem[2]
-		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		#X_batch_s2 = np.vstack(s2)
+		#X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
+		#X_batch_s3 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
+		#X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
 
 		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
-		r3 = np.zeros(batch_size, dtype=np.float)
-		d3 = np.zeros(batch_size, dtype=np.float)
+		rx = np.zeros(batch_size, dtype=np.float)
+		#dx = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
-			if d1[k] == 1 or d2[k] == 1: 
-				d3[k] = 1.
-				r3[k] = -100.0
-			else:
-				k_id = i1[k]
+			edr = 0.0 # sum of discounted rewards
+			k_id = i1[k]
+			for z in range(20):
 				try:
-					mem  = self.get_state_byid(k_id+2)
+					mem  = self.get_state_byid(k_id+z)
 				except KeyError, e:
-					mem = None
 					print 'I got a KeyError - reason "%s"' % str(e)
-					d3[k] = 0.0
-					r3[k] = 0.0
-				if mem != None:
-					if mem[4] == 1:
-						d3[k] = 1.
-						r3[k] = -100.0
-					else:
-						#print "X_batch_s4::mem", mem[2], mem[4] * 1.
-						X_batch_s4[k] = mem[3]
-						d3[k] = mem[4] * 1.
-						r3[k] = mem[2]
-		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
-		#print "X_batch_s3:", X_batch_s3[0]
+					mem = None
+				if mem == None:
+					break
+				if mem[4] == 1: 
+					edr = edr + (-1.)*self.gamma**z
+					break
+				else:
+					edr = edr + mem[2]*self.gamma**z
+					X_batch_s4[k] = mem[3]
+			#print "edr", edr
+			rx[k] = edr
+					
+		#X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		#y_batch[np.arange(batch_size), a1] = rx + np.max(self.predict_batch(X_batch_s4), 1)*self.gamma*
+		y_batch[np.arange(batch_size), a1] = rx 
 
-		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
-		#y_batch[np.arange(batch_size), a1] = r1 + self.gamma * np.max(self.predict_batch(X_batch_s2), 1) * (1 - d1)
-		#print r1[0], self.gamma*r2[0], self.gamma*r2[0]*(1 - d1[0])*(1 - d2[0]),  self.gamma * self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d2) * (1 - d1))[0] 
-		y_batch[np.arange(batch_size), a1] = \
-				r1 + \
-				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
-				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
-				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4), 1) * (1-d2) * (1-d1)*(1-d3)
+		#X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+
+		#X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
+		#X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
+		#r3 = np.zeros(batch_size, dtype=np.float)
+		#d3 = np.zeros(batch_size, dtype=np.float)
+		#for k in range(batch_size):
+		#	if d1[k] == 1 or d2[k] == 1: 
+		#		d3[k] = 1.
+		#		r3[k] = -100.0
+		#	else:
+		#		k_id = i1[k]
+		#		try:
+		#			mem  = self.get_state_byid(k_id+2)
+		#		except KeyError, e:
+		#			mem = None
+		#			print 'I got a KeyError - reason "%s"' % str(e)
+		#			d3[k] = 0.0
+		#			r3[k] = 0.0
+		#		if mem != None:
+		#			if mem[4] == 1:
+		#				d3[k] = 1.
+		#				r3[k] = -100.0
+		#			else:
+		#				#print "X_batch_s4::mem", mem[2], mem[4] * 1.
+		#				X_batch_s4[k] = mem[3]
+		#				d3[k] = mem[4] * 1.
+		#				r3[k] = mem[2]
+		#X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+
+		#y_batch[np.arange(batch_size), a1] = \
+		#		r1 + \
+		#		self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
+		#		self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
+		#		self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4), 1) * (1-d2) * (1-d1)*(1-d3)
 
 
 		return X_batch, y_batch
