@@ -148,6 +148,7 @@ class Agent:
 					break
 				if mem[4] == 1: 
 					edr = edr + (-1.)*self.gamma**z
+					print "edr @ break", z, edr
 					break
 				else:
 					edr = edr + mem[2]*self.gamma**z
