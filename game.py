@@ -230,4 +230,3 @@ class Game:
 		next_state = self.get_state()
 		return next_state, (new_score-old_score)*10
 
-

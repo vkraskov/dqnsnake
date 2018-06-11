@@ -3,9 +3,6 @@ from influxdb import InfluxDBClient
 import datetime
 import numpy as np
 
-
-# select * from dqnsnake where time > now() - 10m;
-
 influx_client = InfluxDBClient("localhost", 8086, "todd", "influxdb41yf3", "test")
 
 class Stats:
@@ -24,7 +21,7 @@ class Stats:
 			"time": int(ts) *1000*1000*1000,
 			"fields": { 
 				"steps": steps, "score": score, 
-				"quality": quality, "epsilon": epsilon, 
+				"quality": quality, "epsilon": int(1000*epsilon)/1000., 
 				"mem": mem, "mem_fail": mem_fail, "mem_good": mem_good, 
 				"episode": episode
 				}
