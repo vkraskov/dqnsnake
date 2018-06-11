@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import game
 import agent
+import play
 import stats
 
 import os
@@ -13,7 +14,7 @@ from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 import logging
 from logging.handlers import RotatingFileHandler
 
-BUILD_NAME = "v3fixed"
+BUILD_NAME = "lstm.v3"
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20
@@ -105,6 +106,8 @@ if __name__ == "__main__":
 
 	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE)
 
+	play = play.Play()
+
 	stats = stats.Stats(BUILD_NAME)
 
 	score_sum = 0.0
@@ -115,6 +118,7 @@ if __name__ == "__main__":
 
 	for e in range(EPISODES):
 		game.reset()
+		agent.newgame()
 		state = game.get_state()
 		for t in range(MAX_STEPS):
 			action = agent.act(state)

@@ -8,18 +8,24 @@ from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge
 from keras.optimizers import Adam
 from keras.layers import Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D, Permute
+from keras.layers.recurrent import LSTM
 from keras.initializers import RandomUniform
+from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.15
+config.gpu_options.per_process_gpu_memory_fraction = 0.5
 set_session(tf.Session(config=config))
 
 STATE_DXY = 16
 STATE_SIZE = STATE_DXY*STATE_DXY
 STATE_CLIP_DXY = STATE_DXY/4
+HIST_MAXLEN = 15
+HIST_FEATURES_SIZE = 1
+
+action2signal = { ACT_FORWARD: [0.9, -0.3, -0.3, -0.3], ACT_BACK: [-0.3, 0.9, -0.3, -0.3], ACT_RIGHT: [-0.3, -0.3, 0.9, -0.3], ACT_LEFT: [-0.3, -0.3, -0.3, 0.9] }
 
 ############
 
@@ -36,8 +42,19 @@ class Agent:
 		self.epsilon_min = 0.001
 		self.epsilon_decay = 0.995
 		self.learning_rate = 0.001
+		self._init_hist_mem()
 		self.model = self._build_model()
 		self.mem_seq_id = 0
+
+	def newgame(self):
+		self._init_hist_mem()
+
+	def _init_hist_mem(self):
+		self.noaction = np.zeros(self.action_size, dtype=np.float)
+		self.hist_mem = deque(maxlen=HIST_MAXLEN)
+		for i in range(HIST_MAXLEN): 
+			self.hist_mem.append(self.noaction)
+			#self.hist_mem.append([-1., 0., 0.])
 
 	def _build_model(self):
 		# https://github.com/fchollet/keras/issues/1860
@@ -58,28 +75,40 @@ class Agent:
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
+		in3 = Input(shape=(HIST_MAXLEN, self.action_size))
+		#in3 = Input(shape=(HIST_MAXLEN, HIST_FEATURES_SIZE))
+		lstm_3_1 = LSTM(100, return_sequences=True, activation='relu')(in3)
+		lstm_3_2 = LSTM(100, return_sequences=True, activation='relu')(lstm_3_1)
+		flatten_3 = Flatten()(lstm_3_2)
+		dense_3_1 = Dense(256, activation='relu')(flatten_3)
+
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
 		dense1 = Dense(256, activation='relu')(joined)
                 dense2 = Dense(self.action_size, activation='linear')(dense1)
 
-		model = Model(inputs = [in1 , in2], outputs = dense2)
+		model = Model(inputs = [in1 , in2, in3], outputs = dense2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
         	return model
 
 	def remember(self, state, action, reward, next_state, done):
-		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
-		if done:
-			prev_state  = self.get_state_byid(self.mem_seq_id-1)
-			if prev_state != None:
-				self.memory_fail.append(prev_state)
-			self.memory_fail.append([state, action, reward, next_state, done, self.mem_seq_id])
-		if reward > 0:
-			prev_state  = self.get_state_byid(self.mem_seq_id-1)
-			if prev_state != None:
-				self.memory_good.append(prev_state)
-			self.memory_good.append([state, action, reward, next_state, done, self.mem_seq_id])
+		self.hist_mem.append(action2signal[action])
+		#self.hist_mem.append([action*1.])
+		#self.hist_mem.append([action*1., reward*1., done*1.])
+		hist_mem = list(self.hist_mem)
+		self.memory.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+		#print self.memory[0][5]
+		#if done:
+		#	prev_state  = self.get_state_byid(self.mem_seq_id-1)
+		#	if prev_state != None:
+		#		self.memory_fail.append(prev_state)
+		#	self.memory_fail.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+		#if reward > 0:
+		#	prev_state  = self.get_state_byid(self.mem_seq_id-1)
+		#	if prev_state != None:
+		#		self.memory_good.append(prev_state)
+		#	self.memory_good.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -92,18 +121,20 @@ class Agent:
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
-		act_values = self.model.predict([np_state, np_state_clip])
+		np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, self.action_size)
+		#np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, HIST_FEATURES_SIZE)
+		act_values = self.model.predict([np_state, np_state_clip, np_hist])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(act_values[0])  # returns action
 
-	def train_batch(self, X_batch, y_batch):
+	def train_batch(self, X_batch, X_batch_hist, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.fit([X_batch, X_batch_clip], y_batch, epochs=1, verbose=0)
+		return self.model.fit([X_batch, X_batch_clip, X_batch_hist], y_batch, epochs=1, verbose=0)
 
-	def predict_batch(self, X_batch):
+	def predict_batch(self, X_batch, X_hist):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.predict_on_batch([X_batch, X_batch_clip])
+		return self.model.predict_on_batch([X_batch, X_batch_clip, X_hist])
 
 	def get_state_byid(self, mem_id):
 		for i in range(len(self.memory)):
@@ -127,11 +158,15 @@ class Agent:
 		r1 = sample[:, 2]
 		s2 = sample[:, 3]
 		d1 = sample[:, 4] * 1.
-		i1 = sample[:, 5]
+		h1 = sample[:, 5]
+		i1 = sample[:, 6]
 
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
-		y_batch = self.predict_batch(X_batch)
+		X_batch_hist = np.vstack(h1)
+		X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, self.action_size)
+		#X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE)
+		y_batch = self.predict_batch(X_batch, X_batch_hist)
 
 		X_batch_s2 = np.vstack(s2)
 		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
@@ -149,6 +184,7 @@ class Agent:
 				X_batch_s3[k] = mem[3]
 				d2[k] = mem[4] * 1.
 				r2[k] = mem[2]
+				#h2[k] = mem[5]
 			else:
 				#print "X_batch_s3::mem == None"
 				d2[k] = 1 * 1.
@@ -159,6 +195,8 @@ class Agent:
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
+		h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, self.action_size), dtype=np.float)
+		#h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE), dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
 			mem  = self.get_state_byid(k_id+2)
@@ -168,11 +206,18 @@ class Agent:
 				X_batch_s4[k] = mem[3]
 				d3[k] = mem[4] * 1.
 				r3[k] = mem[2]
+				h3[k] = mem[5]
 			else:
 				#print "X_batch_s4::mem == None"
 				d3[k] = 1 * 1.
 				r3[k] = -100.0
+				for i in range(HIST_MAXLEN):
+					h3[k][i] = self.noaction
+					#h3[k][i] = [-1.]
+					#h3[k][i] = [-1., 0., 0.]
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		X_batch_s4_hist = h3
+		#X_batch_s4_hist = np.asarray(X_batch_s4_hist).reshape(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE)
 		#print "X_batch_s3:", X_batch_s3[0]
 
 		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
@@ -182,10 +227,10 @@ class Agent:
 				r1 + \
 				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
 				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
-				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4), 1) * (1-d2) * (1-d1)*(1-d3)
+				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4, X_batch_s4_hist), 1) * (1-d2) * (1-d1)*(1-d3)
 
 
-		return X_batch, y_batch
+		return X_batch, X_batch_hist, y_batch
 
 	def get_state_clip(self, state, size):
 		beg_x = int( (len(state) - size)/2 )
@@ -212,8 +257,8 @@ class Agent:
 
 	def replay(self, batch_size):
 		#print "replay from memory random.."
-		X_batch, y_batch = self.create_batch(self.memory, batch_size)
-		self.train_batch(X_batch, y_batch)
+		X_batch, X_batch_hist, y_batch = self.create_batch(self.memory, batch_size)
+		self.train_batch(X_batch, X_batch_hist, y_batch)
 
 		#print "replay from memory fails & wins.."
 		#if len(self.memory_fail)>0:
