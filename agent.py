@@ -138,12 +138,12 @@ class Agent:
 		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 
 		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
-		X_batch_s4 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
+		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
-			mem  = self.get_state_byid(k_id+1)
+			mem  = self.get_state_byid(k_id+2)
 			#print "mem:", mem
 			if mem != None:
 				X_batch_s4[k] = mem[3]
