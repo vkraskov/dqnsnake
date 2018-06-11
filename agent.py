@@ -18,13 +18,13 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.25
+config.gpu_options.per_process_gpu_memory_fraction = 0.85
 set_session(tf.Session(config=config))
 
 STATE_DXY = 16
 STATE_SIZE = STATE_DXY*STATE_DXY
 STATE_CLIP_DXY = STATE_DXY/4
-HIST_MAXLEN = 8
+HIST_MAXLEN = 1000
 HIST_FEATURES_SIZE = 1
 
 action2signal = { ACT_FORWARD: [0.9, -0.3, -0.3, -0.3], ACT_BACK: [-0.3, 0.9, -0.3, -0.3], ACT_RIGHT: [-0.3, -0.3, 0.9, -0.3], ACT_LEFT: [-0.3, -0.3, -0.3, 0.9] }
@@ -90,22 +90,22 @@ class Agent:
 
         	return model
 
-	def remember(self, state, action, reward, next_state, done):
+	def remember(self, state, action, reward, next_state, done, score):
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(STATE_CLIP_DXY*STATE_CLIP_DXY*1)
 		self.hist_mem.append(np_state_clip)
 		hist_mem = np.array(self.hist_mem)
-		self.memory.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+		self.memory.append([state, action, reward, next_state, done, hist_mem, score, self.mem_seq_id])
 		if done:
 			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
 				self.memory_fail.append(prev_state)
-			self.memory_fail.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+			self.memory_fail.append([state, action, reward, next_state, done, hist_mem, score, self.mem_seq_id])
 		if reward > 0:
 			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
 				self.memory_good.append(prev_state)
-			self.memory_good.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+			self.memory_good.append([state, action, reward, next_state, done, hist_mem, score, self.mem_seq_id])
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -137,13 +137,13 @@ class Agent:
 
 	def get_state_byid(self, mem_id):
 		for i in range(len(self.memory)):
-			if self.memory[i][6] == mem_id:
+			if self.memory[i][7] == mem_id:
 				return self.memory[i]
 		for i in range(len(self.memory_fail)):
-			if self.memory_fail[i][6] == mem_id:
+			if self.memory_fail[i][7] == mem_id:
 				return self.memory_fail[i]
 		for i in range(len(self.memory_good)):
-			if self.memory_good[i][6] == mem_id:
+			if self.memory_good[i][7] == mem_id:
 				return self.memory_good[i]
 		return None
 
@@ -158,7 +158,8 @@ class Agent:
 		s2 = sample[:, 3]
 		d1 = sample[:, 4] * 1.
 		h1 = sample[:, 5]
-		i1 = sample[:, 6]
+		c1 = sample[:, 6]
+		i1 = sample[:, 7]
 
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
@@ -218,11 +219,12 @@ class Agent:
 		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
 		#y_batch[np.arange(batch_size), a1] = r1 + self.gamma * np.max(self.predict_batch(X_batch_s2), 1) * (1 - d1)
 		#print r1[0], self.gamma*r2[0], self.gamma*r2[0]*(1 - d1[0])*(1 - d2[0]),  self.gamma * self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d2) * (1 - d1))[0] 
-		y_batch[np.arange(batch_size), a1] = \
-				r1 + \
+		y_batch[np.arange(batch_size), a1] = (1.0+c1/1000.0)*\
+				( r1 + \
 				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
 				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
-				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4, X_batch_s4_hist), 1) * (1-d2) * (1-d1)*(1-d3)
+				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4, X_batch_s4_hist), 1) * (1-d2) * (1-d1)*(1-d3) \
+				)
 
 
 		return X_batch, X_batch_hist, y_batch

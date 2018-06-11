@@ -22,9 +22,9 @@ AREA_HEIGHT = 20
 
 EPISODES = 100001
 BATCH_SIZE = 96
-MAX_STEPS = 5000
+MAX_STEPS = 1000
 ACTION_SIZE = 4
-DQN_MEMSIZE = MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
+DQN_MEMSIZE = 10*1000*1000 #MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
 
 key2str = { KEY_UP: "up", KEY_DOWN: "down", KEY_RIGHT: "right", KEY_LEFT: "left" }
 action2str = { ACT_FORWARD: "forward", ACT_BACK: "back", ACT_RIGHT: "right", ACT_LEFT: "left" }
@@ -150,7 +150,7 @@ if __name__ == "__main__":
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done)
+			agent.remember(state, action, reward, next_state, game.done, game.score)
 			state = next_state
 			if game.done or steps_wo_r > 100:
 				time_sum += t
