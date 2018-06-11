@@ -170,7 +170,7 @@ if __name__ == "__main__":
 					time.sleep(2)
 				break
 
-		stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), len(agent.memory_fail), len(agent.memory_good))
+		stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), len(agent.memory_fail), len(agent.memory_wins))
 		if int(e/100)*100 == e: 
 			stats.flush()
 
