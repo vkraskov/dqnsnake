@@ -22,7 +22,7 @@ AREA_HEIGHT = 20
 
 EPISODES = 100001
 BATCH_SIZE = 96
-MAX_STEPS = 1000
+MAX_STEPS = 5000
 ACTION_SIZE = 4
 DQN_MEMSIZE = MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
 
