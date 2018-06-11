@@ -114,10 +114,10 @@ class Agent:
 	def create_batch(self, memory, memory_fail, memory_wins, batch_size):
 		# https://gist.github.com/kkweon/5605f1dfd27eb9c0353de162247a7456
 		mem_all = deque(memory)
-		mem_x = random.sample(memory_fail, batch_size/10)
+		mem_x = random.sample(memory_fail, min(len(memory_fail), batch_size/10))
 		for i in range(len(mem_x)):
 			mem_all.append(mem_x[i])
-		mem_x = random.sample(memory_wins, batch_size/10)
+		mem_x = random.sample(memory_wins, min(len(memory_wins), batch_size/10))
 		for i in range(len(mem_x)):
 			mem_all.append(mem_x[i])
 		#print "np.asarray(memory).shape", np.asarray(memory).shape

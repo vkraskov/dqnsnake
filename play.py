@@ -130,15 +130,18 @@ if __name__ == "__main__":
 				time.sleep(0.05)
 			next_state, reward = game.step(key)
 
-			#if reward == 0: 
-			#	steps_wo_r += 1
-			#else:
-			#	steps_wo_r = 0
+			if reward == 0: 
+				steps_wo_r += 1
+			else:
+				steps_wo_r = 0
 
 			#if int(e/100)*100 == e: 
 			#	game.render_dxy_state()
 			#	print "----------------"
 			#	time.sleep(0.15)
+			if steps_wo_r > 0 and steps_wo_r < 4:
+				reward = (reward*1.) / (steps_wo_r*1.)
+			#
 			reward = reward if not game.done else -100.0
 			score_sum += game.score
 			score_cnt += 1
