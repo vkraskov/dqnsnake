@@ -79,10 +79,11 @@ class Agent:
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(1,))
-		dense_3_1 = Dense(256, activation='relu')(in3)
+		#in3 = Input(shape=(1,))
+		#dense_3_1 = Dense(256, activation='relu')(in3)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
+		#joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
 		dense1 = Dense(256, activation='relu')(joined)
                 dense2 = Dense(self.action_size, activation='linear')(dense1)
 
@@ -97,7 +98,7 @@ class Agent:
 		#
 		#model = Model(inputs = [in1 , in2, in3], outputs = joined2)
 
-		model = Model(inputs = [in1 , in2, in3], outputs = dense2)
+		model = Model(inputs = [in1 , in2], outputs = dense2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
@@ -132,7 +133,8 @@ class Agent:
 		np_time = np.array([0 * (2.*step/float(self.maxsteps)-1.)])
 		np_time = np_time.reshape(1, 1)
 		#print "np_time", np_time
-		act_values = self.model.predict([np_state, np_state_clip, np_time])
+		act_values = self.model.predict([np_state, np_state_clip])
+		#act_values = self.model.predict([np_state, np_state_clip, np_time])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(act_values[0])  # returns action
@@ -142,11 +144,13 @@ class Agent:
 		#print "X_batch.shape", X_batch.shape
 		#print "X_batch_clip.shape", X_batch_clip.shape
 		#print "X_batch_hist.shape", X_batch_hist.shape
-		return self.model.fit([X_batch, X_batch_clip, X_batch_hist], y_batch, epochs=1, verbose=0)
+		return self.model.fit([X_batch, X_batch_clip], y_batch, epochs=1, verbose=0)
+		#return self.model.fit([X_batch, X_batch_clip, X_batch_hist], y_batch, epochs=1, verbose=0)
 
 	def predict_batch(self, X_batch, X_hist):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.predict_on_batch([X_batch, X_batch_clip, X_hist])
+		return self.model.predict_on_batch([X_batch, X_batch_clip])
+		#return self.model.predict_on_batch([X_batch, X_batch_clip, X_hist])
 
 	def get_state_byid(self, mem_id):
 		for i in range(len(self.memory)):
