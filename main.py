@@ -6,7 +6,6 @@ import stats
 
 import os
 import sys
-import inspect
 import time
 import curses
 from curses import KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN
@@ -15,7 +14,7 @@ from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 import logging
 from logging.handlers import RotatingFileHandler
 
-BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+BUILD_NAME = "time.v1"
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20
@@ -24,7 +23,7 @@ EPISODES = 100001
 BATCH_SIZE = 96
 MAX_STEPS = 1000
 ACTION_SIZE = 4
-DQN_MEMSIZE = 10*1000*1000 #MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
+DQN_MEMSIZE = MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
 
 key2str = { KEY_UP: "up", KEY_DOWN: "down", KEY_RIGHT: "right", KEY_LEFT: "left" }
 action2str = { ACT_FORWARD: "forward", ACT_BACK: "back", ACT_RIGHT: "right", ACT_LEFT: "left" }
@@ -105,7 +104,7 @@ if __name__ == "__main__":
 	game = game.Game(AREA_WIDTH, AREA_HEIGHT)
 	user_play(game)
 
-	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE)
+	agent = agent.Agent(MAX_STEPS, ACTION_SIZE, DQN_MEMSIZE)
 
 	play = play.Play()
 
@@ -122,7 +121,7 @@ if __name__ == "__main__":
 		agent.newgame()
 		state = game.get_state()
 		for t in range(MAX_STEPS):
-			action = agent.act(state)
+			action = agent.act(state, t, game.score)
 			key = action2key[game.key][action]
 			if int(e/100)*100 == e: 
 				game.render()
@@ -150,7 +149,7 @@ if __name__ == "__main__":
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done, game.score)
+			agent.remember(state, action, reward, next_state, game.done, t, game.score)
 			state = next_state
 			if game.done or steps_wo_r > 100:
 				time_sum += t

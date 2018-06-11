@@ -42,12 +42,14 @@ print list(e1)
 #print np.concatenate((a,b),axis=1)
 
 #h3 = np.zeros(shape=(10, 3), dtype=np.float)
-h3 = np.zeros(10)
-print h3
+#h3 = np.zeros(10)
+#print h3
+#
+#h3 = np.array([1,2,3,4])
+#print h3
 
-h3 = np.array([1,2,3,4])
-print h3
 
+print 1.*1/float(100)-1.
 
 
 
