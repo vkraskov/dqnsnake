@@ -14,7 +14,7 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.25
+config.gpu_options.per_process_gpu_memory_fraction = 0.15
 set_session(tf.Session(config=config))
 
 STATE_DXY = 16
@@ -73,7 +73,7 @@ class Agent:
         	return model
 
 	def remember(self, state, action, reward, next_state, done, step, score):
-		nn_step = (2.*float(step)/self.maxsteps-1)
+		nn_step = (2.*float(score)/self.maxsteps-1)
 		self.memory.append([state, action, reward, next_state, done, nn_step, score, self.mem_seq_id])
 		if done:
 			prev_state  = self.get_state_byid(self.mem_seq_id-1)
@@ -88,7 +88,7 @@ class Agent:
 		self.mem_seq_id += 1
 
 	def act(self, state, step, score):
-		nn_step = (2.*float(step)/self.maxsteps-1)
+		nn_step = (2.*float(score)/self.maxsteps-1)
 		if self.epsilon_min < self.epsilon:
 			if np.random.rand() <= self.epsilon:
 				random_action = random.randrange(self.action_size)
@@ -140,7 +140,7 @@ class Agent:
 
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
-		X_extra = np.vstack(t1)
+		X_extra = np.vstack(w1)
 		X_extra = np.asarray(X_extra).reshape(batch_size, 1)
 		y_batch = self.predict_batch(X_batch, X_extra)
 
@@ -180,7 +180,7 @@ class Agent:
 				X_batch_s4[k] = mem[3]
 				d3[k] = mem[4] * 1.
 				r3[k] = mem[2]
-				t3[k] = mem[5]
+				t3[k] = mem[6]
 			else:
 				#print "X_batch_s4::mem == None"
 				d3[k] = 1 * 1.
