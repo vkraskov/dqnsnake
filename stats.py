@@ -21,7 +21,7 @@ class Stats:
 			"time": int(ts) *1000*1000*1000,
 			"fields": { 
 				"steps": steps, "score": score, 
-				"quality": quality, "epsilon": int(1000*epsilon)/1000., 
+				"quality": quality, "epsilon": epsilon, 
 				"mem": mem, "mem_fail": mem_fail, "mem_good": mem_good, 
 				"episode": episode
 				}

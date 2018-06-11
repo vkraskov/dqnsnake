@@ -104,7 +104,7 @@ if __name__ == "__main__":
 	game = game.Game(AREA_WIDTH, AREA_HEIGHT)
 	user_play(game)
 
-	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE, MAX_STEPS)
+	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE)
 
 	stats = stats.Stats(BUILD_NAME)
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
 		game.reset()
 		state = game.get_state()
 		for t in range(MAX_STEPS):
-			action = agent.act(state, t, game.score)
+			action = agent.act(state)
 			key = action2key[game.key][action]
 			if int(e/100)*100 == e: 
 				game.render()
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done, t, game.score)
+			agent.remember(state, action, reward, next_state, game.done)
 			state = next_state
 			if game.done or steps_wo_r > 100:
 				time_sum += t
