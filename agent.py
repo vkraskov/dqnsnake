@@ -79,9 +79,9 @@ class Agent:
 		rec = [state, action, reward, next_state, done, nn_step, score, self.mem_seq_id]
 		self.sdict[self.mem_seq_id] = rec
 		# removing records older mem fail mem size multiplied by maxsteps in episode
-		#delidx = self.mem_seq_id-(self.maxsteps*self.maxsteps)
-		#if delidx >= 0:
-		#	del self.sdict[delidx]
+		delidx = self.mem_seq_id-(self.maxsteps*self.maxsteps)
+		if delidx >= 0:
+			del self.sdict[delidx]
 		self.memory.append(rec)
 		if done:
 			self.memory_fail.append(rec)
