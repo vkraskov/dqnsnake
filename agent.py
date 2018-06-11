@@ -4,7 +4,7 @@ import numpy as np
 from collections import deque
 import keras
 from keras.models import Sequential, Model
-from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge
+from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge, Average
 from keras.optimizers import Adam
 from keras.layers import Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D, Permute
@@ -70,7 +70,7 @@ class Agent:
 		in4 = Input(shape=(1,))
 		dense_4_1 = Dense(256, activation='relu')(in4)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1, dense_4_1])
+		joined = keras.layers.Multiply()([dense_1_1, dense_2_1, dense_3_1, dense_4_1])
 		dense_f_1 = Dense(256, activation='relu')(joined)
 		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
 
@@ -174,7 +174,7 @@ class Agent:
 					break
 				t3[k] = mem[6]
 				if mem[4] == 1: 
-					edr = edr + (-1.)*self.gamma**z
+					edr = edr + (-5.)*self.gamma**z
 					break
 				else:
 					edr = edr + mem[2]*self.gamma**z
