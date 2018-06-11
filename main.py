@@ -117,7 +117,7 @@ if __name__ == "__main__":
 		game.reset()
 		state = game.get_state()
 		for t in range(MAX_STEPS):
-			action = agent.act(state)
+			action = agent.act(state, t, game.score)
 			key = action2key[game.key][action]
 			if int(e/100)*100 == e: 
 				game.render()
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done)
+			agent.remember(state, action, reward, next_state, game.done, t, game.score)
 			state = next_state
 			if game.done or steps_wo_r > 100:
 				time_sum += t
