@@ -1,0 +1,236 @@
+# -*- coding: utf-8 -*-
+import random
+import numpy as np
+from collections import deque
+import keras
+from keras.models import Sequential, Model
+from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge
+from keras.optimizers import Adam
+from keras.layers import Dropout, Flatten, Activation
+from keras.layers import Conv2D, MaxPooling2D, Permute
+from keras.initializers import RandomUniform
+
+import tensorflow as tf
+from keras.backend.tensorflow_backend import set_session
+
+config = tf.ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.5
+set_session(tf.Session(config=config))
+
+STATE_DXY = 16
+STATE_SIZE = STATE_DXY*STATE_DXY
+STATE_CLIP_DXY = STATE_DXY/4
+
+############
+
+class Agent:
+	def __init__(self, action_size, dqnmem_size):
+		self.state_size = STATE_SIZE
+		self.action_size = action_size
+		self.memory = deque(maxlen=dqnmem_size)
+		self.memory_done = deque(maxlen=dqnmem_size)
+		self.gamma = 0.95    # discount rate
+		self.epsilon = 1.0  # exploration rate
+		self.epsilon_min = 0.001
+		self.epsilon_decay = 0.995
+		self.learning_rate = 0.001
+		self.model = self._build_model()
+		self.mem_seq_id = 0
+
+	def _build_model(self):
+		# https://github.com/fchollet/keras/issues/1860
+		# shape(out) = (shape(input) - kernelsize + 2*pad)/strides+1
+		#
+		# https://github.com/matthiasplappert/keras-rl/blob/master/examples/dqn_atari.py
+
+		# https://stackoverflow.com/questions/43152053/appending-layers-with-previous-in-keras-conv2d-object-has-no-attribute-is-p
+		in1 = Input(shape=(STATE_DXY, STATE_DXY, 1))
+		conv2d_1_1 = Conv2D(32, (8, 8), activation = 'relu')(in1)
+		conv2d_1_2 = Conv2D(64, (4, 4), activation = 'relu')(conv2d_1_1)
+		flatten_1 = Flatten()(conv2d_1_2)
+		dense_1_1 = Dense(256, activation='relu')(flatten_1)
+
+		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
+		conv2d_2_1 = Conv2D(16, (2, 2), activation = 'relu')(in1)
+		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
+		flatten_2 = Flatten()(conv2d_2_2)
+		dense_2_1 = Dense(256, activation='relu')(flatten_2)
+
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
+		dense1 = Dense(256, activation='relu')(joined)
+                dense2 = Dense(self.action_size, activation='linear')(dense1)
+
+		model = Model(inputs = [in1 , in2], outputs = dense2)
+                model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
+		model.summary()
+
+        	return model
+
+	def remember(self, state, action, reward, next_state, done):
+		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
+		if done:
+			self.memory_done.append([state, action, reward, next_state, done, self.mem_seq_id])
+		self.mem_seq_id += 1
+
+	def act(self, state):
+		if self.epsilon_min < self.epsilon:
+			if np.random.rand() <= self.epsilon:
+				random_action = random.randrange(self.action_size)
+			#	if random_action == ACT_BACK: 
+			#		print "random_action == BACK"
+				return random_action
+		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
+		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
+		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
+		act_values = self.model.predict([np_state, np_state_clip])
+		#if np.argmax(act_values[0]) == ACT_BACK: 
+		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
+		return np.argmax(act_values[0])  # returns action
+
+	def train_batch(self, X_batch, y_batch):
+		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
+		return self.model.fit([X_batch, X_batch_clip], y_batch, epochs=1, verbose=0)
+
+	def predict_batch(self, X_batch):
+		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
+		return self.model.predict_on_batch([X_batch, X_batch_clip])
+
+	def get_state_byid(self, mem_id):
+		for i in range(len(self.memory)):
+			if self.memory[i][5] == mem_id:
+				return self.memory[i]
+		for i in range(len(self.memory_done)):
+			if self.memory_done[i][5] == mem_id:
+				return self.memory_done[i]
+		return None
+
+	def create_batch(self, memory, batch_size):
+		# https://gist.github.com/kkweon/5605f1dfd27eb9c0353de162247a7456
+		sample = random.sample(memory, batch_size)
+		sample = np.asarray(sample)
+
+		s1 = sample[:, 0]
+		a1 = sample[:, 1].astype(np.int8)
+		r1 = sample[:, 2]
+		s2 = sample[:, 3]
+		d1 = sample[:, 4] * 1.
+		i1 = sample[:, 5]
+
+		X_batch = np.vstack(s1)
+		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
+		y_batch = self.predict_batch(X_batch)
+
+		X_batch_s2 = np.vstack(s2)
+		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
+
+		X_batch_s3 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
+		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
+		r2 = np.zeros(batch_size, dtype=np.float)
+		d2 = np.zeros(batch_size, dtype=np.float)
+		for k in range(batch_size):
+			k_id = i1[k]
+			mem  = self.get_state_byid(k_id+1)
+			#print "mem:", mem
+			if mem != None:
+				X_batch_s3[k] = mem[3]
+				d2[k] = mem[4] * 1.
+				r2[k] = mem[2]
+		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+
+		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
+		X_batch_s4 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY)
+		r3 = np.zeros(batch_size, dtype=np.float)
+		d3 = np.zeros(batch_size, dtype=np.float)
+		for k in range(batch_size):
+			k_id = i1[k]
+			mem  = self.get_state_byid(k_id+1)
+			#print "mem:", mem
+			if mem != None:
+				X_batch_s4[k] = mem[3]
+				d3[k] = mem[4] * 1.
+				r3[k] = mem[2]
+		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		#print "X_batch_s3:", X_batch_s3[0]
+
+		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
+		#y_batch[np.arange(batch_size), a1] = r1 + self.gamma * np.max(self.predict_batch(X_batch_s2), 1) * (1 - d1)
+		#print r1[0], self.gamma*r2[0], self.gamma*r2[0]*(1 - d1[0])*(1 - d2[0]),  self.gamma * self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d2) * (1 - d1))[0] 
+		y_batch[np.arange(batch_size), a1] = \
+				r1 + \
+				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
+				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
+				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4), 1) * (1-d2) * (1-d1)*(1-d3)
+
+
+		return X_batch, y_batch
+
+	def get_state_clip(self, state, size):
+		beg_x = int( (len(state) - size)/2 )
+		beg_y = int( (len(state[0]) - size)/2 )
+		end_x = beg_x + size-1
+		end_y = beg_y + size-1
+		#
+		clip = np.zeros(size*size, dtype=np.float)
+		clip = np.asarray(clip).reshape(size, size)
+		#
+		for y in range(beg_y, end_y+1):
+			for x in range(beg_x, end_x+1):
+				clip[x-beg_x][y-beg_y] = state[x][y]
+		return clip
+
+	def get_state_clip_batch(self, batch, size):
+		batch_tmp = np.asarray(batch).reshape(len(batch), STATE_DXY, STATE_DXY)
+		batch_clip = np.zeros(len(batch)*size*size, dtype=np.float)
+		batch_clip = np.asarray(batch_clip).reshape(len(batch), size, size)
+		for i in range(len(batch)):
+			batch_clip[i] = self.get_state_clip(batch_tmp[i], size)
+		batch_clip = np.asarray(batch_clip).reshape(len(batch), size, size, 1)
+		return batch_clip
+
+	def replay(self, batch_size):
+		#print "replay from memory random.."
+		X_batch, y_batch = self.create_batch(self.memory, batch_size)
+		self.train_batch(X_batch, y_batch)
+
+		#print "replay from memory fails & wins.."
+		#if len(self.memory_done)>0:
+		#	batch_done_size = min(10+DQN_MEMSIZE/40, len(self.memory_done))
+		#	minibatch = random.sample(self.memory_done, batch_done_size)
+		#	#print len(minibatch)
+		#	X_batch, y_batch = self.create_batch(minibatch, batch_done_size)
+		#	self.train_batch(X_batch, y_batch)
+
+		if self.epsilon > self.epsilon_min:
+			self.epsilon *= self.epsilon_decay
+
+	#	tmp_mem = []
+	#	for e in self.memory:
+	#		if done:
+	#			tmp_mem.append([e.state, e.action, e.reward, e.next_state, e.done])
+	#	minibatch = random.sample(tmp_mem, min(1000, len(tmp_mem)))
+	#	for state, action, reward, next_state, done in minibatch:
+	#		target = reward
+	#		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
+	#		target_f = self.model.predict(np_state)
+	#		target_f[0][action] = target
+	#		self.model.fit(np_state, target_f, epochs=1, verbose=0)
+	#	#
+	#	minibatch = random.sample(self.memory, batch_size)
+	#	for state, action, reward, next_state, done in minibatch:
+	#	    target = reward
+	#	    if not done:
+	#		np_next_state = np.asarray(next_state).reshape(1, STATE_DXY, STATE_DXY, 1)
+	#		target = (reward + self.gamma * np.amax(self.model.predict(np_next_state)[0]))
+	#	    np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
+	#	    target_f = self.model.predict(np_state)
+	#	    target_f[0][action] = target
+	#	    self.model.fit(np_state, target_f, epochs=1, verbose=0)
+	#	if self.epsilon > self.epsilon_min:
+	#	    self.epsilon *= self.epsilon_decay
+
+	def load(self, name):
+		self.model.load_weights(name)
+
+	def save(self, name):
+		self.model.save_weights(name)
+
