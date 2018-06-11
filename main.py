@@ -104,7 +104,7 @@ if __name__ == "__main__":
 	game = game.Game(AREA_WIDTH, AREA_HEIGHT)
 	user_play(game)
 
-	agent = agent.Agent(ACTION_SIZE, MAX_STEPS, DQN_MEMSIZE)
+	agent = agent.Agent(ACTION_SIZE, DQN_MEMSIZE, MAX_STEPS)
 
 	stats = stats.Stats(BUILD_NAME)
 
@@ -124,9 +124,8 @@ if __name__ == "__main__":
 				game.render()
 				print "key:", key2str[key], "    action:", action2str[action], "   time:", t
 				quality = score_sum/(score_cnt+1)
-				msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, time: {}"\
-					.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), time_sum/100.0)
-					#.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
+				msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
+					.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
 				print msg_str
 			#	print "----------------"
 			#	game.render_dxy_state()
@@ -158,9 +157,8 @@ if __name__ == "__main__":
 				if int(e/100)*100 == e: 
 					quality = score_sum/score_cnt
 					stats_arr.append((e, quality))
-					msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, time: {}"\
-						.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), time_sum/100.0)
-						#.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
+					msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
+						.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
 					print(msg_str)
 					logger.info(msg_str)
 					print("quality: {:0.2f}".format(quality))
@@ -175,8 +173,7 @@ if __name__ == "__main__":
 					time.sleep(2)
 				break
 
-		stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), 0, 0)
-		#stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), len(agent.memory_fail), len(agent.memory_good))
+		stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), len(agent.memory_fail), len(agent.memory_good))
 		if int(e/100)*100 == e: 
 			stats.flush()
 
