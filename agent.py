@@ -14,7 +14,7 @@ import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.5
+config.gpu_options.per_process_gpu_memory_fraction = 0.15
 set_session(tf.Session(config=config))
 
 STATE_DXY = 16
@@ -30,7 +30,7 @@ class Agent:
 		self.dqnmem_size = dqnmem_size
 		self.memory = deque(maxlen=dqnmem_size)
 		self.memory_fail = deque(maxlen=dqnmem_size)
-		self.memory_wins = deque(maxlen=dqnmem_size)
+		self.memory_good = deque(maxlen=dqnmem_size)
 		self.gamma = 0.95    # discount rate
 		self.epsilon = 1.0  # exploration rate
 		self.epsilon_min = 0.001
@@ -53,7 +53,7 @@ class Agent:
 		dense_1_1 = Dense(256, activation='relu')(flatten_1)
 
 		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
-		conv2d_2_1 = Conv2D(16, (2, 2), activation = 'relu')(in1)
+		conv2d_2_1 = Conv2D(16, (2, 2), activation = 'relu')(in2)
 		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
@@ -71,15 +71,15 @@ class Agent:
 	def remember(self, state, action, reward, next_state, done):
 		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
 		if done:
-			prev_state  = self.get_state_byid(self.memory, self.mem_seq_id-1)
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
 				self.memory_fail.append(prev_state)
 			self.memory_fail.append([state, action, reward, next_state, done, self.mem_seq_id])
 		if reward > 0:
-			prev_state  = self.get_state_byid(self.memory, self.mem_seq_id-1)
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
-				self.memory_wins.append(prev_state)
-			self.memory_wins.append([state, action, reward, next_state, done, self.mem_seq_id])
+				self.memory_good.append(prev_state)
+			self.memory_good.append([state, action, reward, next_state, done, self.mem_seq_id])
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -105,27 +105,21 @@ class Agent:
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
 		return self.model.predict_on_batch([X_batch, X_batch_clip])
 
-	def get_state_byid(self, mem, mem_id):
-		for i in range(len(mem)):
-			if mem[i][5] == mem_id:
-				return mem[i]
+	def get_state_byid(self, mem_id):
+		for i in range(len(self.memory)):
+			if self.memory[i][5] == mem_id:
+				return self.memory[i]
+		for i in range(len(self.memory_fail)):
+			if self.memory_fail[i][5] == mem_id:
+				return self.memory_fail[i]
+		for i in range(len(self.memory_good)):
+			if self.memory_good[i][5] == mem_id:
+				return self.memory_good[i]
 		return None
 
-	def create_batch(self, memory, memory_fail, memory_wins, batch_size):
+	def create_batch(self, memory, batch_size):
 		# https://gist.github.com/kkweon/5605f1dfd27eb9c0353de162247a7456
-		mem_all = deque(memory)
-		mem_x = random.sample(memory_fail, min(len(memory_fail), batch_size/10))
-		for i in range(len(mem_x)):
-			mem_all.append(mem_x[i])
-		mem_x = random.sample(memory_wins, min(len(memory_wins), batch_size/10))
-		for i in range(len(mem_x)):
-			mem_all.append(mem_x[i])
-		#print "np.asarray(memory).shape", np.asarray(memory).shape
-		#print "np.asarray(memory_fail).shape", np.asarray(memory_fail).shape
-		#print "np.asarray(memory_wins).shape", np.asarray(memory_wins).shape
-		#print "np.asarray(mem_all).shape", np.asarray(mem_all).shape
-
-		sample = random.sample(mem_all, batch_size)
+		sample = random.sample(memory, batch_size)
 		sample = np.asarray(sample)
 
 		s1 = sample[:, 0]
@@ -148,7 +142,7 @@ class Agent:
 		d2 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
-			mem  = self.get_state_byid(mem_all, k_id+1)
+			mem  = self.get_state_byid(k_id+1)
 			#print "mem:", mem
 			if mem != None:
 				#print "X_batch_s3::mem", mem[2], mem[4] * 1.
@@ -167,7 +161,7 @@ class Agent:
 		d3 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
-			mem  = self.get_state_byid(mem_all, k_id+2)
+			mem  = self.get_state_byid(k_id+2)
 			#print "mem:", mem
 			if mem != None:
 				#print "X_batch_s4::mem", mem[2], mem[4] * 1.
@@ -217,20 +211,20 @@ class Agent:
 		return batch_clip
 
 	def replay(self, batch_size):
+		#print "replay from memory random.."
+		X_batch, y_batch = self.create_batch(self.memory, batch_size)
+		self.train_batch(X_batch, y_batch)
+
 		#print "replay from memory fails & wins.."
 		#if len(self.memory_fail)>0:
 		#	batch_fail_size = min(16, len(self.memory_fail))
 		#	X_batch, y_batch = self.create_batch(self.memory_fail, batch_fail_size)
 		#	self.train_batch(X_batch, y_batch)
 
-		#if len(self.memory_wins)>0:
-		#	batch_good_size = min(128, len(self.memory_wins))
-		#	X_batch, y_batch = self.create_batch(self.memory_wins, batch_good_size)
+		#if len(self.memory_good)>0:
+		#	batch_good_size = min(16, len(self.memory_good))
+		#	X_batch, y_batch = self.create_batch(self.memory_good, batch_good_size)
 		#	self.train_batch(X_batch, y_batch)
-
-		#print "replay from memory random.."
-		X_batch, y_batch = self.create_batch(self.memory, self.memory_fail, self.memory_wins, batch_size)
-		self.train_batch(X_batch, y_batch)
 
 		if self.epsilon > self.epsilon_min:
 			self.epsilon *= self.epsilon_decay

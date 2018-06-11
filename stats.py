@@ -6,7 +6,8 @@ import numpy as np
 influx_client = InfluxDBClient("localhost", 8086, "todd", "influxdb41yf3", "test")
 
 class Stats:
-	def __init__(self):
+	def __init__(self, build):
+		self.build = build
 		self.arr_json = []
 
 	def add(self, episode, steps, score, quality, epsilon, mem, mem_fail, mem_good):
@@ -16,12 +17,13 @@ class Stats:
 		self.arr_json.append(
 			{
 			"measurement": "dqnsnake",
-			"tags": { "episode": episode },
+			"tags": { "build": self.build },
 			"time": int(ts) *1000*1000*1000,
 			"fields": { 
 				"steps": steps, "score": score, 
 				"quality": quality, "epsilon": epsilon, 
-				"mem": mem, "mem_fail": mem_fail, "mem_good": mem_good
+				"mem": mem, "mem_fail": mem_fail, "mem_good": mem_good, 
+				"episode": episode
 				}
 			}
 		)
