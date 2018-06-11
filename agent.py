@@ -28,6 +28,7 @@ class Agent:
 		self.state_size = STATE_SIZE
 		self.action_size = action_size
 		self.dqnmem_size = dqnmem_size
+		self.sdict = {}
 		self.memory = deque(maxlen=dqnmem_size)
 		self.memory_fail = deque(maxlen=dqnmem_size)
 		self.memory_good = deque(maxlen=dqnmem_size)
@@ -69,17 +70,13 @@ class Agent:
         	return model
 
 	def remember(self, state, action, reward, next_state, done):
-		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
+		rec = [state, action, reward, next_state, done, self.mem_seq_id]
+		self.sdict[self.mem_seq_id] = rec
+		self.memory.append(rec)
 		if done:
-			prev_state  = self.get_state_byid(self.mem_seq_id-1)
-			if prev_state != None:
-				self.memory_fail.append(prev_state)
-			self.memory_fail.append([state, action, reward, next_state, done, self.mem_seq_id])
+			self.memory_fail.append(rec)
 		if reward > 0:
-			prev_state  = self.get_state_byid(self.mem_seq_id-1)
-			if prev_state != None:
-				self.memory_good.append(prev_state)
-			self.memory_good.append([state, action, reward, next_state, done, self.mem_seq_id])
+			self.memory_good.append(rec)
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -106,16 +103,7 @@ class Agent:
 		return self.model.predict_on_batch([X_batch, X_batch_clip])
 
 	def get_state_byid(self, mem_id):
-		for i in range(len(self.memory)):
-			if self.memory[i][5] == mem_id:
-				return self.memory[i]
-		for i in range(len(self.memory_fail)):
-			if self.memory_fail[i][5] == mem_id:
-				return self.memory_fail[i]
-		for i in range(len(self.memory_good)):
-			if self.memory_good[i][5] == mem_id:
-				return self.memory_good[i]
-		return None
+		return self.sdict[mem_id]
 
 	def create_batch(self, memory, batch_size):
 		# https://gist.github.com/kkweon/5605f1dfd27eb9c0353de162247a7456
@@ -141,18 +129,23 @@ class Agent:
 		r2 = np.zeros(batch_size, dtype=np.float)
 		d2 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
-			k_id = i1[k]
-			mem  = self.get_state_byid(k_id+1)
-			#print "mem:", mem
-			if mem != None:
-				#print "X_batch_s3::mem", mem[2], mem[4] * 1.
-				X_batch_s3[k] = mem[3]
-				d2[k] = mem[4] * 1.
-				r2[k] = mem[2]
-			else:
-				#print "X_batch_s3::mem == None"
-				d2[k] = 1 * 1.
+			if d1[k] == 1: 
+				d2[k] = 1.
 				r2[k] = -100.0
+			else:
+				k_id = i1[k]
+				try:
+					mem  = self.get_state_byid(k_id+1)
+				except KeyError, e:
+					mem = None
+					print 'I got a KeyError - reason "%s"' % str(e)
+					d2[k] = 0.0
+					r2[k] = 0.0
+				if mem != None:
+					#print "X_batch_s3::mem", mem[2], mem[4] * 1.
+					X_batch_s3[k] = mem[3]
+					d2[k] = mem[4] * 1.
+					r2[k] = mem[2]
 		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 
 		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
@@ -160,18 +153,27 @@ class Agent:
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
-			k_id = i1[k]
-			mem  = self.get_state_byid(k_id+2)
-			#print "mem:", mem
-			if mem != None:
-				#print "X_batch_s4::mem", mem[2], mem[4] * 1.
-				X_batch_s4[k] = mem[3]
-				d3[k] = mem[4] * 1.
-				r3[k] = mem[2]
-			else:
-				#print "X_batch_s4::mem == None"
-				d3[k] = 1 * 1.
+			if d1[k] == 1 or d2[k] == 1: 
+				d3[k] = 1.
 				r3[k] = -100.0
+			else:
+				k_id = i1[k]
+				try:
+					mem  = self.get_state_byid(k_id+2)
+				except KeyError, e:
+					mem = None
+					print 'I got a KeyError - reason "%s"' % str(e)
+					d3[k] = 0.0
+					r3[k] = 0.0
+				if mem != None:
+					if mem[4] == 1:
+						d3[k] = 1.
+						r3[k] = -100.0
+					else:
+						#print "X_batch_s4::mem", mem[2], mem[4] * 1.
+						X_batch_s4[k] = mem[3]
+						d3[k] = mem[4] * 1.
+						r3[k] = mem[2]
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 		#print "X_batch_s3:", X_batch_s3[0]
 

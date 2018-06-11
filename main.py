@@ -178,7 +178,7 @@ if __name__ == "__main__":
 			stats.flush()
 
 		steps_wo_r = 0
-		if len(agent.memory) > BATCH_SIZE:
+		if len(agent.memory) > BATCH_SIZE*2:
 			#print "agent.replay.."
 			agent.replay(BATCH_SIZE)
 
