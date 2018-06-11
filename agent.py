@@ -17,9 +17,9 @@ config = tf.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = 0.15
 set_session(tf.Session(config=config))
 
-STATE_DXY = 16
+STATE_DXY = 17
 STATE_SIZE = STATE_DXY*STATE_DXY
-STATE_CLIP_DXY = STATE_DXY/4
+STATE_CLIP_DXY = 5
 
 ############
 
@@ -48,13 +48,13 @@ class Agent:
 
 		# https://stackoverflow.com/questions/43152053/appending-layers-with-previous-in-keras-conv2d-object-has-no-attribute-is-p
 		in1 = Input(shape=(STATE_DXY, STATE_DXY, 1))
-		conv2d_1_1 = Conv2D(32, (8, 8), activation = 'relu')(in1)
-		conv2d_1_2 = Conv2D(64, (4, 4), activation = 'relu')(conv2d_1_1)
+		conv2d_1_1 = Conv2D(32, (9, 9), activation = 'relu')(in1)
+		conv2d_1_2 = Conv2D(64, (3, 3), activation = 'relu')(conv2d_1_1)
 		flatten_1 = Flatten()(conv2d_1_2)
 		dense_1_1 = Dense(256, activation='relu')(flatten_1)
 
 		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
-		conv2d_2_1 = Conv2D(16, (2, 2), activation = 'relu')(in2)
+		conv2d_2_1 = Conv2D(16, (3, 3), activation = 'relu')(in2)
 		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
