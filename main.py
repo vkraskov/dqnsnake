@@ -144,7 +144,7 @@ if __name__ == "__main__":
 			#	game.render_dxy_state()
 			#	print "----------------"
 			#	time.sleep(0.15)
-			reward = reward if not game.done else -100.0
+			reward = reward if not game.done else -1.0
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward

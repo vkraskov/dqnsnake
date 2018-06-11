@@ -228,5 +228,5 @@ class Game:
 		self.update()
 		new_score = self.score
 		next_state = self.get_state()
-		return next_state, (new_score-old_score)*10
+		return next_state, (new_score-old_score)*1.
 

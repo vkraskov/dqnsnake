@@ -169,7 +169,7 @@ class Agent:
 					t2[i][k] = mem[6]
 				else:
 					d2[i][k] = 1 * 1.
-					r2[i][k] = -100.0
+					r2[i][k] = -1.0
 					t2[i][k] = 0.0
 
 		X_batch_s3 = np.asarray(X_batch_s3[NN-1]).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
