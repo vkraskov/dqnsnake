@@ -144,7 +144,7 @@ class Agent:
 		X_batch_s2 = np.vstack(s2)
 		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
 
-		NN = 3
+		NN = 7
 		X_batch_s3 = np.zeros(NN*batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
 		X_batch_s3 = np.asarray(X_batch_s3).reshape(NN, batch_size, STATE_DXY, STATE_DXY)
 		r2 = np.zeros(NN*batch_size, dtype=np.float)
@@ -177,9 +177,13 @@ class Agent:
 		X_extra_s3 = np.asarray(X_extra_s3).reshape(batch_size, 1)
 		y_batch[np.arange(batch_size), a1] = \
 			r1 + \
-			self.gamma*r2[1]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
+			self.gamma**1*r2[1]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+			self.gamma**2*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+			self.gamma**3*r2[3]*(1-d1)*(1-d2[1])*(1-d2[2])*(1-d2[3]) + \
+			self.gamma**4*r2[4]*(1-d1)*(1-d2[1])*(1-d2[2])*(1-d2[3])*(1-d2[4]) + \
+			self.gamma**5*r2[5]*(1-d1)*(1-d2[1])*(1-d2[2])*(1-d2[3])*(1-d2[4])*(1-d2[5]) + \
+			self.gamma**6*r2[6]*(1-d1)*(1-d2[1])*(1-d2[2])*(1-d2[3])*(1-d2[4])*(1-d2[5])*(1-d2[6]) + \
+			self.gamma**7*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])*(1-d2[3])*(1-d2[4])*(1-d2[5])*(1-d2[6])
 
 		return X_batch, X_extra, y_batch
 
