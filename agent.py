@@ -20,6 +20,7 @@ set_session(tf.Session(config=config))
 STATE_DXY = 16
 STATE_SIZE = STATE_DXY*STATE_DXY
 STATE_CLIP_DXY = STATE_DXY/4
+STATE_NEAR_DXY = 3
 
 ############
 
@@ -60,14 +61,20 @@ class Agent:
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(1,))
-		dense_3_1 = Dense(256, activation='relu')(in3)
+		in3 = Input(shape=(STATE_NEAR_DXY, STATE_NEAR_DXY, 1))
+		conv2d_3_1 = Conv2D(16, (3, 3), activation = 'relu')(in3)
+		conv2d_3_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_3_1)
+		flatten_3 = Flatten()(conv2d_3_2)
+		dense_3_1 = Dense(256, activation='relu')(flatten_3)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
+		in4 = Input(shape=(1,))
+		dense_4_1 = Dense(256, activation='relu')(in4)
+
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1, dense_4_1])
 		dense_f_1 = Dense(256, activation='relu')(joined)
 		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
 
-		model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
+		model = Model(inputs = [in1 , in2, in3, in4], outputs = dense_f_2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
@@ -95,23 +102,32 @@ class Agent:
 			#	if random_action == ACT_BACK: 
 			#		print "random_action == BACK"
 				return random_action
+		# wide view
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
+		# clipped view
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
+		# near view
+		state_near = self.get_state_clip(state, STATE_NEAR_DXY)
+		np_state_near =  np.asarray(state_near).reshape(1, STATE_NEAR_DXY, STATE_NEAR_DXY, 1)
+		# score as tails grows
 		nn_step = (2.*float(score)/self.maxsteps-1)
 		np_step_arr =  np.asarray(nn_step).reshape(1, 1)
-		self.act_values = self.model.predict([np_state, np_state_clip, np_step_arr])
+		# predict
+		self.act_values = self.model.predict([np_state, np_state_clip, np_state_near, np_step_arr])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(self.act_values[0])  # returns action
 
 	def train_batch(self, X_batch, X_extra, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.fit([X_batch, X_batch_clip, X_extra], y_batch, epochs=1, verbose=0)
+		X_batch_near = self.get_state_clip_batch(X_batch, STATE_NEAR_DXY)
+		return self.model.fit([X_batch, X_batch_clip, X_batch_near, X_extra], y_batch, epochs=1, verbose=0)
 
 	def predict_batch(self, X_batch, X_extra):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.predict_on_batch([X_batch, X_batch_clip, X_extra])
+		X_batch_near = self.get_state_clip_batch(X_batch, STATE_NEAR_DXY)
+		return self.model.predict_on_batch([X_batch, X_batch_clip, X_batch_near, X_extra])
 
 	def get_state_byid(self, mem_id):
 		return self.sdict[mem_id]
