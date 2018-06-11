@@ -27,8 +27,10 @@ class Agent:
 	def __init__(self, action_size, dqnmem_size):
 		self.state_size = STATE_SIZE
 		self.action_size = action_size
+		self.dqnmem_size = dqnmem_size
 		self.memory = deque(maxlen=dqnmem_size)
-		self.memory_done = deque(maxlen=dqnmem_size)
+		self.memory_fail = deque(maxlen=dqnmem_size)
+		self.memory_good = deque(maxlen=dqnmem_size)
 		self.gamma = 0.95    # discount rate
 		self.epsilon = 1.0  # exploration rate
 		self.epsilon_min = 0.001
@@ -69,7 +71,15 @@ class Agent:
 	def remember(self, state, action, reward, next_state, done):
 		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
 		if done:
-			self.memory_done.append([state, action, reward, next_state, done, self.mem_seq_id])
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
+			if prev_state != None:
+				self.memory_fail.append(prev_state)
+			self.memory_fail.append([state, action, reward, next_state, done, self.mem_seq_id])
+		if reward > 0:
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
+			if prev_state != None:
+				self.memory_good.append(prev_state)
+			self.memory_good.append([state, action, reward, next_state, done, self.mem_seq_id])
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -99,9 +109,12 @@ class Agent:
 		for i in range(len(self.memory)):
 			if self.memory[i][5] == mem_id:
 				return self.memory[i]
-		for i in range(len(self.memory_done)):
-			if self.memory_done[i][5] == mem_id:
-				return self.memory_done[i]
+		for i in range(len(self.memory_fail)):
+			if self.memory_fail[i][5] == mem_id:
+				return self.memory_fail[i]
+		for i in range(len(self.memory_good)):
+			if self.memory_good[i][5] == mem_id:
+				return self.memory_good[i]
 		return None
 
 	def create_batch(self, memory, batch_size):
@@ -132,9 +145,14 @@ class Agent:
 			mem  = self.get_state_byid(k_id+1)
 			#print "mem:", mem
 			if mem != None:
+				#print "X_batch_s3::mem", mem[2], mem[4] * 1.
 				X_batch_s3[k] = mem[3]
 				d2[k] = mem[4] * 1.
 				r2[k] = mem[2]
+			else:
+				#print "X_batch_s3::mem == None"
+				d2[k] = 1 * 1.
+				r2[k] = -100.0
 		X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 
 		X_batch_s4 = np.zeros(batch_size*STATE_DXY*STATE_DXY, dtype=np.float)
@@ -146,9 +164,14 @@ class Agent:
 			mem  = self.get_state_byid(k_id+2)
 			#print "mem:", mem
 			if mem != None:
+				#print "X_batch_s4::mem", mem[2], mem[4] * 1.
 				X_batch_s4[k] = mem[3]
 				d3[k] = mem[4] * 1.
 				r3[k] = mem[2]
+			else:
+				#print "X_batch_s4::mem == None"
+				d3[k] = 1 * 1.
+				r3[k] = -100.0
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 		#print "X_batch_s3:", X_batch_s3[0]
 
@@ -193,11 +216,14 @@ class Agent:
 		self.train_batch(X_batch, y_batch)
 
 		#print "replay from memory fails & wins.."
-		#if len(self.memory_done)>0:
-		#	batch_done_size = min(10+DQN_MEMSIZE/40, len(self.memory_done))
-		#	minibatch = random.sample(self.memory_done, batch_done_size)
-		#	#print len(minibatch)
-		#	X_batch, y_batch = self.create_batch(minibatch, batch_done_size)
+		#if len(self.memory_fail)>0:
+		#	batch_fail_size = min(16, len(self.memory_fail))
+		#	X_batch, y_batch = self.create_batch(self.memory_fail, batch_fail_size)
+		#	self.train_batch(X_batch, y_batch)
+
+		#if len(self.memory_good)>0:
+		#	batch_good_size = min(16, len(self.memory_good))
+		#	X_batch, y_batch = self.create_batch(self.memory_good, batch_good_size)
 		#	self.train_batch(X_batch, y_batch)
 
 		if self.epsilon > self.epsilon_min:

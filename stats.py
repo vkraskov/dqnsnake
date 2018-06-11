@@ -9,7 +9,7 @@ class Stats:
 	def __init__(self):
 		self.arr_json = []
 
-	def add(self, episode, steps, score, quality, epsilon, mem_done):
+	def add(self, episode, steps, score, quality, epsilon, mem, mem_fail, mem_good):
 		dt = datetime.datetime.now()
 		ts = dt.strftime('%s')
 
@@ -18,7 +18,11 @@ class Stats:
 			"measurement": "dqnsnake",
 			"tags": { "episode": episode },
 			"time": int(ts) *1000*1000*1000,
-			"fields": { "steps": steps, "score": score, "quality": quality, "epsilon": epsilon, "mem_done": mem_done }
+			"fields": { 
+				"steps": steps, "score": score, 
+				"quality": quality, "epsilon": epsilon, 
+				"mem": mem, "mem_fail": mem_fail, "mem_good": mem_good
+				}
 			}
 		)
 
