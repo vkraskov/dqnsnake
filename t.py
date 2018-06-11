@@ -1,2 +1,3 @@
 
-print 0.95**20
+for z in range(3):
+	print z

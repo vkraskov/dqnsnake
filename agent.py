@@ -138,7 +138,7 @@ class Agent:
 		for k in range(batch_size):
 			edr = 0.0 # sum of discounted rewards
 			k_id = i1[k]
-			for z in range(20):
+			for z in range(100):
 				try:
 					mem  = self.get_state_byid(k_id+z)
 				except KeyError, e:
@@ -154,9 +154,9 @@ class Agent:
 					X_batch_s4[k] = mem[3]
 			#print "edr", edr
 			rx[k] = edr
-					
+
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
-		y_batch[np.arange(batch_size), a1] = rx + np.max(self.predict_batch(X_batch_s4), 1)*self.gamma**20
+		y_batch[np.arange(batch_size), a1] = rx + np.max(self.predict_batch(X_batch_s4), 1)*self.gamma**100
 		###y_batch[np.arange(batch_size), a1] = rx 
 
 		#X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
