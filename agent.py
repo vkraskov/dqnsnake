@@ -75,7 +75,7 @@ class Agent:
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(HIST_MAXLEN, self.action_size))
+		in3 = Input(shape=(self.action_size, HIST_MAXLEN))
 		#in3 = Input(shape=(HIST_MAXLEN, HIST_FEATURES_SIZE))
 		lstm_3_1 = LSTM(100, return_sequences=True, activation='relu')(in3)
 		lstm_3_2 = LSTM(100, return_sequences=True, activation='relu')(lstm_3_1)
@@ -121,7 +121,7 @@ class Agent:
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
-		np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, self.action_size)
+		np_hist = np.array(self.hist_mem).reshape(1, self.action_size, HIST_MAXLEN)
 		#np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, HIST_FEATURES_SIZE)
 		act_values = self.model.predict([np_state, np_state_clip, np_hist])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
@@ -164,7 +164,7 @@ class Agent:
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
 		X_batch_hist = np.vstack(h1)
-		X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, self.action_size)
+		X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, self.action_size, HIST_MAXLEN)
 		#X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE)
 		y_batch = self.predict_batch(X_batch, X_batch_hist)
 
@@ -195,7 +195,7 @@ class Agent:
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
-		h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, self.action_size), dtype=np.float)
+		h3 = np.zeros(shape=(batch_size, self.action_size, HIST_MAXLEN), dtype=np.float)
 		#h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE), dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
@@ -211,8 +211,8 @@ class Agent:
 				#print "X_batch_s4::mem == None"
 				d3[k] = 1 * 1.
 				r3[k] = -100.0
-				for i in range(HIST_MAXLEN):
-					h3[k][i] = self.noaction
+				for i in range(self.action_size):
+					h3[k][i] = np.zeros(HIST_MAXLEN, dtype=np.float)
 					#h3[k][i] = [-1.]
 					#h3[k][i] = [-1., 0., 0.]
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
