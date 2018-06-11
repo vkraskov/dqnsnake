@@ -14,7 +14,7 @@ from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 import logging
 from logging.handlers import RotatingFileHandler
 
-BUILD_NAME = "lstm.v4"
+BUILD_NAME = "lstm.v5"
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20

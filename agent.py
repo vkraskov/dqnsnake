@@ -10,13 +10,15 @@ from keras.layers import Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D, Permute
 from keras.layers.recurrent import LSTM
 from keras.initializers import RandomUniform
+from keras.layers import TimeDistributed
+
 from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 
 import tensorflow as tf
 from keras.backend.tensorflow_backend import set_session
 
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.5
+config.gpu_options.per_process_gpu_memory_fraction = 0.25
 set_session(tf.Session(config=config))
 
 STATE_DXY = 16
@@ -75,12 +77,10 @@ class Agent:
 		flatten_2 = Flatten()(conv2d_2_2)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(self.action_size, HIST_MAXLEN))
+		in3 = Input(shape=(HIST_MAXLEN, self.action_size))
 		#in3 = Input(shape=(HIST_MAXLEN, HIST_FEATURES_SIZE))
-		lstm_3_1 = LSTM(100, return_sequences=True, activation='relu')(in3)
-		lstm_3_2 = LSTM(100, return_sequences=True, activation='relu')(lstm_3_1)
-		flatten_3 = Flatten()(lstm_3_2)
-		dense_3_1 = Dense(256, activation='relu')(flatten_3)
+		lstm_3_1 = LSTM(128)(in3)
+		dense_3_1 = Dense(256, activation='relu')(lstm_3_1)
 
 		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
 		dense1 = Dense(256, activation='relu')(joined)
@@ -99,16 +99,16 @@ class Agent:
 		hist_mem = list(self.hist_mem)
 		self.memory.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
 		#print self.memory[0][5]
-		#if done:
-		#	prev_state  = self.get_state_byid(self.mem_seq_id-1)
-		#	if prev_state != None:
-		#		self.memory_fail.append(prev_state)
-		#	self.memory_fail.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
-		#if reward > 0:
-		#	prev_state  = self.get_state_byid(self.mem_seq_id-1)
-		#	if prev_state != None:
-		#		self.memory_good.append(prev_state)
-		#	self.memory_good.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+		if done:
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
+			if prev_state != None:
+				self.memory_fail.append(prev_state)
+			self.memory_fail.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
+		if reward > 0:
+			prev_state  = self.get_state_byid(self.mem_seq_id-1)
+			if prev_state != None:
+				self.memory_good.append(prev_state)
+			self.memory_good.append([state, action, reward, next_state, done, hist_mem, self.mem_seq_id])
 		self.mem_seq_id += 1
 
 	def act(self, state):
@@ -121,7 +121,7 @@ class Agent:
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
-		np_hist = np.array(self.hist_mem).reshape(1, self.action_size, HIST_MAXLEN)
+		np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, self.action_size)
 		#np_hist = np.array(self.hist_mem).reshape(1, HIST_MAXLEN, HIST_FEATURES_SIZE)
 		act_values = self.model.predict([np_state, np_state_clip, np_hist])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
@@ -130,6 +130,9 @@ class Agent:
 
 	def train_batch(self, X_batch, X_batch_hist, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
+		#print "X_batch.shape", X_batch.shape
+		#print "X_batch_clip.shape", X_batch_clip.shape
+		#print "X_batch_hist.shape", X_batch_hist.shape
 		return self.model.fit([X_batch, X_batch_clip, X_batch_hist], y_batch, epochs=1, verbose=0)
 
 	def predict_batch(self, X_batch, X_hist):
@@ -138,13 +141,13 @@ class Agent:
 
 	def get_state_byid(self, mem_id):
 		for i in range(len(self.memory)):
-			if self.memory[i][5] == mem_id:
+			if self.memory[i][6] == mem_id:
 				return self.memory[i]
 		for i in range(len(self.memory_fail)):
-			if self.memory_fail[i][5] == mem_id:
+			if self.memory_fail[i][6] == mem_id:
 				return self.memory_fail[i]
 		for i in range(len(self.memory_good)):
-			if self.memory_good[i][5] == mem_id:
+			if self.memory_good[i][6] == mem_id:
 				return self.memory_good[i]
 		return None
 
@@ -164,7 +167,7 @@ class Agent:
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
 		X_batch_hist = np.vstack(h1)
-		X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, self.action_size, HIST_MAXLEN)
+		X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, self.action_size)
 		#X_batch_hist = np.asarray(X_batch_hist).reshape(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE)
 		y_batch = self.predict_batch(X_batch, X_batch_hist)
 
@@ -195,7 +198,7 @@ class Agent:
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
-		h3 = np.zeros(shape=(batch_size, self.action_size, HIST_MAXLEN), dtype=np.float)
+		h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, self.action_size), dtype=np.float)
 		#h3 = np.zeros(shape=(batch_size, HIST_MAXLEN, HIST_FEATURES_SIZE), dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
@@ -211,8 +214,8 @@ class Agent:
 				#print "X_batch_s4::mem == None"
 				d3[k] = 1 * 1.
 				r3[k] = -100.0
-				for i in range(self.action_size):
-					h3[k][i] = np.zeros(HIST_MAXLEN, dtype=np.float)
+				for i in range(HIST_MAXLEN):
+					h3[k][i] = self.noaction
 					#h3[k][i] = [-1.]
 					#h3[k][i] = [-1., 0., 0.]
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
