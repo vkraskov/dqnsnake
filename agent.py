@@ -155,9 +155,9 @@ class Agent:
 			#print "edr", edr
 			rx[k] = edr
 					
-		#X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
-		#y_batch[np.arange(batch_size), a1] = rx + np.max(self.predict_batch(X_batch_s4), 1)*self.gamma*
-		y_batch[np.arange(batch_size), a1] = rx 
+		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
+		y_batch[np.arange(batch_size), a1] = rx + np.max(self.predict_batch(X_batch_s4), 1)*self.gamma**20
+		###y_batch[np.arange(batch_size), a1] = rx 
 
 		#X_batch_s3 = np.asarray(X_batch_s3).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
 
