@@ -121,6 +121,8 @@ if __name__ == "__main__":
 			key = action2key[game.key][action]
 			if int(e/100)*100 == e: 
 				game.render()
+				state_near = agent.get_state_clip(state, 3)
+				game.render_dxy_arr(state_near, [0, 0], [len(state_near), len(state_near[0])])
 				print "key:", key2str[key], "    action:", action2str[action], "   time:", t
 				quality = score_sum/(score_cnt+1)
 				msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
