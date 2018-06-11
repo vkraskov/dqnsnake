@@ -119,8 +119,7 @@ if __name__ == "__main__":
 		for t in range(MAX_STEPS):
 			action = agent.act(state, t, game.score)
 			key = action2key[game.key][action]
-			#if int(e/100)*100 == e: 
-			if True:
+			if int(e/100)*100 == e: 
 				game.render()
 				state_near = agent.get_state_clip(state, 3)
 				game.render_dxy_arr(state_near, [0, 0], [len(state_near), len(state_near[0])])
@@ -145,7 +144,7 @@ if __name__ == "__main__":
 			#	game.render_dxy_state()
 			#	print "----------------"
 			#	time.sleep(0.15)
-			reward = reward if not game.done else -5.0
+			reward = reward if not game.done else -100.0
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
@@ -181,7 +180,7 @@ if __name__ == "__main__":
 			stats.flush()
 
 		steps_wo_r = 0
-		if len(agent.memory) > BATCH_SIZE*2:
+		if len(agent.memory) > BATCH_SIZE:
 			#print "agent.replay.."
 			agent.replay(BATCH_SIZE)
 
