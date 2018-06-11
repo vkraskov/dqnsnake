@@ -71,7 +71,7 @@ class Agent:
 		dense_4_1 = Dense(256, activation='relu')(in4)
 
 		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1, dense_4_1])
-		dense_f_1 = Dense(256, activation='relu')(joined)
+		dense_f_1 = Dense(2048, activation='relu')(joined)
 		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
 
 		model = Model(inputs = [in1 , in2, in3, in4], outputs = dense_f_2)
