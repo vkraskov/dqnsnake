@@ -24,11 +24,10 @@ STATE_CLIP_DXY = STATE_DXY/4
 ############
 
 class Agent:
-	def __init__(self, action_size, dqnmem_size, maxsteps):
+	def __init__(self, action_size, dqnmem_size):
 		self.state_size = STATE_SIZE
 		self.action_size = action_size
 		self.dqnmem_size = dqnmem_size
-		self.maxsteps = maxsteps
 		self.memory = deque(maxlen=dqnmem_size)
 		self.memory_fail = deque(maxlen=dqnmem_size)
 		self.memory_good = deque(maxlen=dqnmem_size)
@@ -50,45 +49,43 @@ class Agent:
 		in1 = Input(shape=(STATE_DXY, STATE_DXY, 1))
 		conv2d_1_1 = Conv2D(32, (8, 8), activation = 'relu')(in1)
 		conv2d_1_2 = Conv2D(64, (4, 4), activation = 'relu')(conv2d_1_1)
-		flatten_1 = Flatten()(conv2d_1_2)
+		conv2d_1_3 = Conv2D(128, (2, 2), activation = 'relu')(conv2d_1_2)
+		conv2d_1_4 = Conv2D(256, (1, 1), activation = 'relu')(conv2d_1_3)
+		flatten_1 = Flatten()(conv2d_1_4)
 		dense_1_1 = Dense(256, activation='relu')(flatten_1)
 
 		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
-		conv2d_2_1 = Conv2D(16, (2, 2), activation = 'relu')(in2)
-		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
-		flatten_2 = Flatten()(conv2d_2_2)
+		conv2d_2_1 = Conv2D(8, (4, 4), activation = 'relu')(in2)
+		conv2d_2_2 = Conv2D(16, (1, 1), activation = 'relu')(conv2d_2_1)
+		conv2d_2_3 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_2)
+		flatten_2 = Flatten()(conv2d_2_3)
 		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(1,))
-		dense_3_1 = Dense(256, activation='relu')(in3)
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
+		dense1 = Dense(256, activation='relu')(joined)
+                dense2 = Dense(self.action_size, activation='linear')(dense1)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
-		dense_f_1 = Dense(256, activation='relu')(joined)
-                dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
-
-		model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
+		model = Model(inputs = [in1 , in2], outputs = dense2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
         	return model
 
-	def remember(self, state, action, reward, next_state, done, step, score):
-		nn_step = (2.*float(step)/self.maxsteps-1)
-		self.memory.append([state, action, reward, next_state, done, nn_step, score, self.mem_seq_id])
+	def remember(self, state, action, reward, next_state, done):
+		self.memory.append([state, action, reward, next_state, done, self.mem_seq_id])
 		if done:
 			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
 				self.memory_fail.append(prev_state)
-			self.memory_fail.append([state, action, reward, next_state, done, nn_step, score, self.mem_seq_id])
+			self.memory_fail.append([state, action, reward, next_state, done, self.mem_seq_id])
 		if reward > 0:
 			prev_state  = self.get_state_byid(self.mem_seq_id-1)
 			if prev_state != None:
 				self.memory_good.append(prev_state)
-			self.memory_good.append([state, action, reward, next_state, done, nn_step, score, self.mem_seq_id])
+			self.memory_good.append([state, action, reward, next_state, done, self.mem_seq_id])
 		self.mem_seq_id += 1
 
-	def act(self, state, step, score):
-		nn_step = (2.*float(step)/self.maxsteps-1)
+	def act(self, state):
 		if self.epsilon_min < self.epsilon:
 			if np.random.rand() <= self.epsilon:
 				random_action = random.randrange(self.action_size)
@@ -98,29 +95,28 @@ class Agent:
 		np_state = np.asarray(state).reshape(1, STATE_DXY, STATE_DXY, 1) 
 		state_clip = self.get_state_clip(state, STATE_CLIP_DXY)
 		np_state_clip =  np.asarray(state_clip).reshape(1, STATE_CLIP_DXY, STATE_CLIP_DXY, 1)
-		np_step_arr =  np.asarray(nn_step).reshape(1, 1)
-		act_values = self.model.predict([np_state, np_state_clip, np_step_arr])
+		act_values = self.model.predict([np_state, np_state_clip])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(act_values[0])  # returns action
 
-	def train_batch(self, X_batch, X_extra, y_batch):
+	def train_batch(self, X_batch, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.fit([X_batch, X_batch_clip, X_extra], y_batch, epochs=1, verbose=0)
+		return self.model.fit([X_batch, X_batch_clip], y_batch, epochs=1, verbose=0)
 
-	def predict_batch(self, X_batch, X_extra):
+	def predict_batch(self, X_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.predict_on_batch([X_batch, X_batch_clip, X_extra])
+		return self.model.predict_on_batch([X_batch, X_batch_clip])
 
 	def get_state_byid(self, mem_id):
 		for i in range(len(self.memory)):
-			if self.memory[i][7] == mem_id:
+			if self.memory[i][5] == mem_id:
 				return self.memory[i]
 		for i in range(len(self.memory_fail)):
-			if self.memory_fail[i][7] == mem_id:
+			if self.memory_fail[i][5] == mem_id:
 				return self.memory_fail[i]
 		for i in range(len(self.memory_good)):
-			if self.memory_good[i][7] == mem_id:
+			if self.memory_good[i][5] == mem_id:
 				return self.memory_good[i]
 		return None
 
@@ -134,15 +130,11 @@ class Agent:
 		r1 = sample[:, 2]
 		s2 = sample[:, 3]
 		d1 = sample[:, 4] * 1.
-		t1 = sample[:, 5]
-		w1 = sample[:, 6]
-		i1 = sample[:, 7]
+		i1 = sample[:, 5]
 
 		X_batch = np.vstack(s1)
 		X_batch = np.asarray(X_batch).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
-		X_extra = np.vstack(t1)
-		X_extra = np.asarray(X_extra).reshape(batch_size, 1)
-		y_batch = self.predict_batch(X_batch, X_extra)
+		y_batch = self.predict_batch(X_batch)
 
 		X_batch_s2 = np.vstack(s2)
 		X_batch_s2 = np.asarray(X_batch_s2).reshape(batch_size, STATE_DXY, STATE_DXY, 1) 
@@ -170,7 +162,6 @@ class Agent:
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY)
 		r3 = np.zeros(batch_size, dtype=np.float)
 		d3 = np.zeros(batch_size, dtype=np.float)
-		t3 = np.zeros(batch_size, dtype=np.float)
 		for k in range(batch_size):
 			k_id = i1[k]
 			mem  = self.get_state_byid(k_id+2)
@@ -180,15 +171,11 @@ class Agent:
 				X_batch_s4[k] = mem[3]
 				d3[k] = mem[4] * 1.
 				r3[k] = mem[2]
-				t3[k] = mem[5]
 			else:
 				#print "X_batch_s4::mem == None"
 				d3[k] = 1 * 1.
 				r3[k] = -100.0
-				t3[k] = 0.0
 		X_batch_s4 = np.asarray(X_batch_s4).reshape(batch_size, STATE_DXY, STATE_DXY, 1)
-		X_extra_s4 = np.vstack(t3)
-		X_extra_s4 = np.asarray(X_extra_s4).reshape(batch_size, 1)
 		#print "X_batch_s3:", X_batch_s3[0]
 
 		#print r1[0], self.gamma * (np.max(self.predict_batch(X_batch_s3), 1) * (1 - d1))[0] 
@@ -198,10 +185,10 @@ class Agent:
 				r1 + \
 				self.gamma * r2 * (1-d1)*(1-d2)*(1-d3) + \
 				self.gamma * self.gamma * r3 * (1-d2)*(1-d1)*(1-d3) + \
-				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4, X_extra_s4), 1) * (1-d2) * (1-d1)*(1-d3)
+				self.gamma * self.gamma * self.gamma * np.max(self.predict_batch(X_batch_s4), 1) * (1-d2) * (1-d1)*(1-d3)
 
 
-		return X_batch, X_extra, y_batch
+		return X_batch, y_batch
 
 	def get_state_clip(self, state, size):
 		beg_x = int( (len(state) - size)/2 )
@@ -228,8 +215,8 @@ class Agent:
 
 	def replay(self, batch_size):
 		#print "replay from memory random.."
-		X_batch, X_extra, y_batch = self.create_batch(self.memory, batch_size)
-		self.train_batch(X_batch, X_extra, y_batch)
+		X_batch, y_batch = self.create_batch(self.memory, batch_size)
+		self.train_batch(X_batch, y_batch)
 
 		#print "replay from memory fails & wins.."
 		#if len(self.memory_fail)>0:
