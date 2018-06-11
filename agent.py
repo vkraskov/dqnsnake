@@ -24,7 +24,7 @@ set_session(tf.Session(config=config))
 STATE_DXY = 16
 STATE_SIZE = STATE_DXY*STATE_DXY
 STATE_CLIP_DXY = STATE_DXY/4
-HIST_MAXLEN = 15
+HIST_MAXLEN = 4
 HIST_FEATURES_SIZE = 1
 
 action2signal = { ACT_FORWARD: [0.9, -0.3, -0.3, -0.3], ACT_BACK: [-0.3, 0.9, -0.3, -0.3], ACT_RIGHT: [-0.3, -0.3, 0.9, -0.3], ACT_LEFT: [-0.3, -0.3, -0.3, 0.9] }
@@ -80,6 +80,9 @@ class Agent:
 		in3 = Input(shape=(HIST_MAXLEN, self.action_size))
 		#in3 = Input(shape=(HIST_MAXLEN, HIST_FEATURES_SIZE))
 		lstm_3_1 = LSTM(128)(in3)
+		#lstm_3_1 = LSTM(128, return_sequences=True)(in3)
+		#lstm_3_2 = LSTM(128)(lstm_3_1)
+		#dense_3_1 = Dense(256, activation='relu')(lstm_3_2)
 		dense_3_1 = Dense(256, activation='relu')(lstm_3_1)
 
 		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])

@@ -6,6 +6,7 @@ import stats
 
 import os
 import sys
+import inspect
 import time
 import curses
 from curses import KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN
@@ -14,7 +15,7 @@ from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 import logging
 from logging.handlers import RotatingFileHandler
 
-BUILD_NAME = "lstm.v5"
+BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20
