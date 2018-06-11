@@ -21,7 +21,7 @@ AREA_HEIGHT = 20
 
 EPISODES = 100001
 BATCH_SIZE = 96
-MAX_STEPS = 1000
+MAX_STEPS = 5000
 ACTION_SIZE = 4
 DQN_MEMSIZE = MAX_STEPS*4	# memory no less than 4 games with steps up to max steps
 
@@ -133,10 +133,12 @@ if __name__ == "__main__":
 				time.sleep(0.05)
 			next_state, reward = game.step(key)
 
-			#if reward == 0: 
-			#	steps_wo_r += 1
-			#else:
-			#	steps_wo_r = 0
+			if reward == 0: 
+				steps_wo_r += 1
+			else:
+				steps_wo_r = 0
+			if steps_wo_r > 3:
+				steps_wo_r = 0 
 
 			#if int(e/100)*100 == e: 
 			#	game.render_dxy_state()
@@ -146,7 +148,7 @@ if __name__ == "__main__":
 			score_sum += game.score
 			score_cnt += 1
 			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done, t, game.score)
+			agent.remember(state, action, 3.*reward/(1.+steps_wo_r), next_state, game.done, t, game.score)
 			state = next_state
 			if game.done or steps_wo_r > 100:
 				time_sum += t
