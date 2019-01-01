@@ -70,20 +70,22 @@ class Agent:
 		flatten_1 = Flatten()(conv2d_1_2)
 		dense_1_1 = Dense(256, activation='relu')(flatten_1)
 
-		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
-		conv2d_2_1 = Conv2D(16, (3, 3), activation = 'relu')(in2)
-		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
-		flatten_2 = Flatten()(conv2d_2_2)
-		dense_2_1 = Dense(256, activation='relu')(flatten_2)
+	#	in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
+	#	conv2d_2_1 = Conv2D(16, (3, 3), activation = 'relu')(in2)
+	#	conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
+	#	flatten_2 = Flatten()(conv2d_2_2)
+	#	dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
-		in3 = Input(shape=(1,))
-		dense_3_1 = Dense(256, activation='relu')(in3)
+	#	in3 = Input(shape=(1,))
+	#	dense_3_1 = Dense(256, activation='relu')(in3)
 
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
-		dense_f_1 = Dense(256, activation='relu')(joined)
-		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
+	#	joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
+	#	dense_f_1 = Dense(256, activation='relu')(joined)
+	#	dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
 
-		model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
+	#	model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
+		dense_f_2 = Dense(self.action_size, activation='linear')(dense_1_1)
+		model = Model(inputs = [in1 , ], outputs = dense_f_2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
@@ -128,18 +130,20 @@ class Agent:
 		nn_step = (2.*float(score)/self.maxsteps-1)
 		np_step_arr =  np.asarray(nn_step).reshape(1, 1)
 		# predict
-		self.act_values = self.model.predict([np_state, np_state_clip, np_step_arr])
+		self.act_values = self.model.predict([np_state, ])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(self.act_values[0])  # returns action
 
 	def train_batch(self, X_batch, X_extra, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.fit([X_batch, X_batch_clip, X_extra], y_batch, epochs=1, verbose=0)
+		#return self.model.fit([X_batch, X_batch_clip, X_extra], y_batch, epochs=1, verbose=0)
+		return self.model.fit([X_batch, ], y_batch, epochs=1, verbose=0)
 
 	def predict_batch(self, X_batch, X_extra):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
-		return self.model.predict_on_batch([X_batch, X_batch_clip, X_extra])
+		#return self.model.predict_on_batch([X_batch, X_batch_clip, X_extra])
+		return self.model.predict_on_batch([X_batch, ])
 
 	def get_state_byid(self, mem_id):
 		return self.sdict[mem_id]
@@ -184,7 +188,7 @@ class Agent:
 				try:
 					mem  = self.get_state_byid(k_id+i)
 				except KeyError, e:
-					print 'I got a KeyError - reason "%s"' % str(e)
+					#print 'I got a KeyError - reason "%s"' % str(e)
 					mem = None
 				if mem != None:
 					X_batch_s3[i][k] = mem[3]
@@ -202,8 +206,9 @@ class Agent:
 		y_batch[np.arange(batch_size), a1] = \
 			r1 + \
 			self.gamma*r2[1]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
+			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) 
+		#	self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+		#	self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
 
 		X_batch_flip = np.vstack(s1)
 		X_batch_flip = np.asarray(X_batch_flip).reshape(batch_size, STATE_DXY, STATE_DXY)
@@ -245,9 +250,10 @@ class Agent:
 			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
 			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3_flip, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
 
-		return  np.concatenate((X_batch, X_batch_flip), axis=0),\
-			np.concatenate((X_extra, X_extra), axis=0),\
-			np.concatenate((y_batch,y_batch_flip), axis=0)
+	#	return  np.concatenate((X_batch, X_batch_flip), axis=0),\
+	#		np.concatenate((X_extra, X_extra), axis=0),\
+	#		np.concatenate((y_batch,y_batch_flip), axis=0)
+		return  X_batch, None, y_batch
 		#return X_batch_flip, X_extra, y_batch_flip
 
 

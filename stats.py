@@ -9,6 +9,7 @@ class Stats:
 	def __init__(self, build):
 		self.build = build
 		self.arr_json = []
+		influx_client.query("delete from dqnsnake where build = '" + build + "'")
 
 	def add(self, episode, steps, score, quality, epsilon, mem, mem_fail, mem_good):
 		dt = datetime.datetime.now()

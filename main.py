@@ -14,12 +14,19 @@ from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 import logging
 from logging.handlers import RotatingFileHandler
 
-BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+file = open(".git/HEAD", "r")
+head_line = file.readline()
+file.close()
+head_split = head_line.strip("\n").split("/")
+head = head_split[len(head_split)-1]
+
+#BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+BUILD_NAME = head
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20
 
-EPISODES = 100001
+EPISODES = 10001
 BATCH_SIZE = 96
 MAX_STEPS = 1000
 ACTION_SIZE = 4
@@ -86,15 +93,16 @@ def user_play(game):
 		game.move_snake(key)
 		game.update()
 		game.render()
-		print "render_dxy_state"
-		print "----------------"
-		game.render_dxy_state()
-		print "----------------"
+	#	print "render_dxy_state"
+	#	print "----------------"
+	#	game.render_dxy_state()
+	#	print "----------------"
 
 		if game.done:
 			break
 
-		time.sleep(0.25)
+		delay = 0.25 - game.moves*(0.25-0.05)/1000
+		time.sleep(delay)
 
 #############
 
@@ -132,7 +140,7 @@ if __name__ == "__main__":
 			#	print "----------------"
 			#	game.render_dxy_state()
 			#	print "----------------"
-				time.sleep(0.05)
+				time.sleep(0.01)
 			next_state, reward = game.step(key)
 
 			#if reward == 0: 
