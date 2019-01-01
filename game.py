@@ -65,6 +65,7 @@ class Game:
 			#		echr = dir2chr[self.key]
 				sys.stdout.write(echr)
 			sys.stdout.write('\n')
+			sys.stdout.flush()
 
 	def render_dxy(self, beg_pos, end_pos):
 		arr = self.arr
@@ -77,7 +78,7 @@ class Game:
 	def render(self, info = ""):
 		arr = self.arr
 		os.system('clear') 
-		print "Score: " + str(self.score), info
+		print "Score: " + str(self.score), info, "      Moves: " + str(self.moves)
 		self.render_dxy([0, 0], [self.w, self.h])
 
 	def set_blank(self):

@@ -1,52 +1,32 @@
 # -*- coding: utf-8 -*-
-import game
-import agent
-import stats
-
-import os
-import sys
-import inspect
+#import os
+#import sys
+#import inspect
 import time
 import curses
 from curses import KEY_RIGHT, KEY_LEFT, KEY_UP, KEY_DOWN
+
+import game
 from game import ACT_FORWARD, ACT_BACK, ACT_RIGHT, ACT_LEFT
 
-import logging
-from logging.handlers import RotatingFileHandler
-
-BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
+#BUILD_NAME = os.path.basename(os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))))
 
 AREA_WIDTH = 60
 AREA_HEIGHT = 20
 
-EPISODES = 100001
-BATCH_SIZE = 96
-MAX_STEPS = 1000
-ACTION_SIZE = 4
+#EPISODES = 100001
+#BATCH_SIZE = 96
+#MAX_STEPS = 1000
+#ACTION_SIZE = 4
 
-key2str = { KEY_UP: "up", KEY_DOWN: "down", KEY_RIGHT: "right", KEY_LEFT: "left" }
-action2str = { ACT_FORWARD: "forward", ACT_BACK: "back", ACT_RIGHT: "right", ACT_LEFT: "left" }
-action2key = { 
-	KEY_UP:    { ACT_FORWARD: KEY_UP,    ACT_BACK: KEY_DOWN,  ACT_LEFT: KEY_LEFT,  ACT_RIGHT: KEY_RIGHT },
-	KEY_RIGHT: { ACT_FORWARD: KEY_RIGHT, ACT_BACK: KEY_LEFT,  ACT_LEFT: KEY_UP,    ACT_RIGHT: KEY_DOWN  },
-	KEY_DOWN:  { ACT_FORWARD: KEY_DOWN,  ACT_BACK: KEY_UP,    ACT_LEFT: KEY_RIGHT, ACT_RIGHT: KEY_LEFT  },
-	KEY_LEFT:  { ACT_FORWARD: KEY_LEFT,  ACT_BACK: KEY_RIGHT, ACT_LEFT: KEY_DOWN,  ACT_RIGHT: KEY_UP    }
-	}
-
-thisName = os.path.splitext(sys.argv[0])[0]
-
-logPath = "/tmp/"
-fileName = thisName
-
-log_formatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s] %(message)s")
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-log_handler = logging.handlers.RotatingFileHandler("{0}/{1}.log".format(logPath, fileName), maxBytes=(1048576*5), backupCount=7)
-log_handler.setFormatter(log_formatter)
-logger.addHandler(log_handler)
-
-stats_arr = []
+#key2str = { KEY_UP: "up", KEY_DOWN: "down", KEY_RIGHT: "right", KEY_LEFT: "left" }
+#action2str = { ACT_FORWARD: "forward", ACT_BACK: "back", ACT_RIGHT: "right", ACT_LEFT: "left" }
+#action2key = { 
+#	KEY_UP:    { ACT_FORWARD: KEY_UP,    ACT_BACK: KEY_DOWN,  ACT_LEFT: KEY_LEFT,  ACT_RIGHT: KEY_RIGHT },
+#	KEY_RIGHT: { ACT_FORWARD: KEY_RIGHT, ACT_BACK: KEY_LEFT,  ACT_LEFT: KEY_UP,    ACT_RIGHT: KEY_DOWN  },
+#	KEY_DOWN:  { ACT_FORWARD: KEY_DOWN,  ACT_BACK: KEY_UP,    ACT_LEFT: KEY_RIGHT, ACT_RIGHT: KEY_LEFT  },
+#	KEY_LEFT:  { ACT_FORWARD: KEY_LEFT,  ACT_BACK: KEY_RIGHT, ACT_LEFT: KEY_DOWN,  ACT_RIGHT: KEY_UP    }
+#	}
 
 ###################
 
@@ -86,15 +66,12 @@ def user_play(game):
 		game.move_snake(key)
 		game.update()
 		game.render()
-		print "render_dxy_state"
-		print "----------------"
-		game.render_dxy_state()
-		print "----------------"
 
 		if game.done:
 			break
 
-		time.sleep(0.25)
+		delay = 0.25 - game.moves*(0.25-0.05)/1000
+		time.sleep(delay)
 
 #############
 
@@ -102,92 +79,4 @@ if __name__ == "__main__":
 
 	game = game.Game(AREA_WIDTH, AREA_HEIGHT)
 	user_play(game)
-
-	agent = agent.Agent(ACTION_SIZE, MAX_STEPS)
-
-	stats = stats.Stats(BUILD_NAME)
-
-	score_sum = 0.0
-	time_sum = 0.0
-	score_cnt = 0.0
-	steps_wo_r = 0
-	quality_max = 0.0
-
-	for e in range(EPISODES):
-		game.reset()
-		state = game.get_state()
-		for t in range(MAX_STEPS):
-			action = agent.act(state, t, game.score)
-			key = action2key[game.key][action]
-			if int(e/100)*100 == e: 
-				game.render()
-				state_near = agent.get_state_clip(state, 3)
-				game.render_dxy_arr(state_near, [0, 0], [len(state_near), len(state_near[0])])
-				print "key:", key2str[key], "    action:", action2str[action], "   time:", t
-				quality = score_sum/(score_cnt+1)
-				msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
-					.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
-				print msg_str
-				print agent.act_values
-			#	print "----------------"
-			#	game.render_dxy_state()
-			#	print "----------------"
-				time.sleep(0.05)
-			next_state, reward = game.step(key)
-
-			#if reward == 0: 
-			#	steps_wo_r += 1
-			#else:
-			#	steps_wo_r = 0
-
-			#if int(e/100)*100 == e: 
-			#	game.render_dxy_state()
-			#	print "----------------"
-			#	time.sleep(0.15)
-			reward = reward if not game.done else -100.0
-			score_sum += game.score
-			score_cnt += 1
-			#print "reward", reward
-			agent.remember(state, action, reward, next_state, game.done, t, game.score)
-			state = next_state
-			if game.done or steps_wo_r > 100:
-				time_sum += t
-				#if t > 100:
-				#	game.render()
-				#	time.sleep(2)
-				#print("episode: {}/{}, time: {}, score: {}, e: {:.2}".format(e, EPISODES, t, game.score, agent.epsilon))
-				if int(e/100)*100 == e: 
-					quality = score_sum/score_cnt
-					stats_arr.append((e, quality))
-					msg_str = "episode: {}/{}, epsilon: {:.2}, q: {:0.2f}, mem: {}, mem_done: {}, time: {}"\
-						.format(e, EPISODES, agent.epsilon, quality, len(agent.memory), len(agent.memory_fail), time_sum/100.0)
-					print(msg_str)
-					logger.info(msg_str)
-					print("quality: {:0.2f}".format(quality))
-					if quality_max < quality:
-						quality_max = quality
-					#	if quality_max > 15.0: 
-					#		logger.info("Saving weights @ episode: {}/{}, quality: {:0.2f}".format(e, EPISODES, quality))
-					#		agent.save("/tmp/" + thisName + ".h5")
-					time_sum = 0.0
-					score_sum = 0.0
-					score_cnt = 0.0
-					time.sleep(2)
-				break
-
-		stats.add(e, game.moves, game.score, game.score/100.0, agent.epsilon, len(agent.memory), len(agent.memory_fail), len(agent.memory_good))
-		if int(e/100)*100 == e: 
-			stats.flush()
-
-		steps_wo_r = 0
-		if len(agent.memory) > BATCH_SIZE:
-			#print "agent.replay.."
-			agent.replay(BATCH_SIZE)
-
-	for elem in stats_arr:
-		e = elem[0]
-		v = elem[1]
-		i = int(v)
-		sys.stdout.write("# %-10i | %s (%0.2f)\n" % (e, '='*i, v))
-
 
