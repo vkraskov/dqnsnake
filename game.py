@@ -128,23 +128,21 @@ class Game:
 				l_x += 1
 			l_y += 1
 
-		return dxy_arr
-
 		# https://stackoverflow.com/questions/8421337/rotating-a-two-dimensional-array-in-python
 		# rotating clockwise (forward == up)
-#		if self.key == KEY_UP:
-#			dxy_arr_rotated = dxy_arr
-#		elif self.key == KEY_LEFT:
-#			dxy_arr_rotated = zip(*dxy_arr[::-1])
-#			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
-#			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
-#		elif self.key == KEY_DOWN:
-#			dxy_arr_rotated = zip(*dxy_arr[::-1])
-#			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
-#		elif self.key == KEY_RIGHT:
-#			dxy_arr_rotated = zip(*dxy_arr[::-1])
-#		
-#		return dxy_arr_rotated
+		if self.key == KEY_UP:
+			dxy_arr_rotated = dxy_arr
+		elif self.key == KEY_LEFT:
+			dxy_arr_rotated = zip(*dxy_arr[::-1])
+			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
+			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
+		elif self.key == KEY_DOWN:
+			dxy_arr_rotated = zip(*dxy_arr[::-1])
+			dxy_arr_rotated = zip(*dxy_arr_rotated[::-1])
+		elif self.key == KEY_RIGHT:
+			dxy_arr_rotated = zip(*dxy_arr[::-1])
+		
+		return dxy_arr_rotated
 
 	def get_state(self, d = STATE_DXY):
 		dxy_arr_rotated = self.get_dxy_state(d)
