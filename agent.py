@@ -249,10 +249,10 @@ class Agent:
 			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
 			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3_flip, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
 
-	#	return  np.concatenate((X_batch, X_batch_flip), axis=0),\
-	#		np.concatenate((X_extra, X_extra), axis=0),\
-	#		np.concatenate((y_batch,y_batch_flip), axis=0)
-		return  X_batch, None, y_batch
+		return  np.concatenate((X_batch, X_batch_flip), axis=0),\
+			np.concatenate((X_extra, X_extra), axis=0),\
+			np.concatenate((y_batch,y_batch_flip), axis=0)
+	#	return  X_batch, None, y_batch
 		#return X_batch_flip, X_extra, y_batch_flip
 
 
