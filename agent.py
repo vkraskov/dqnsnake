@@ -206,9 +206,8 @@ class Agent:
 		y_batch[np.arange(batch_size), a1] = \
 			r1 + \
 			self.gamma*r2[1]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) 
-		#	self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
-		#	self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
+			self.gamma*self.gamma*r2[2]*(1-d1)*(1-d2[1])*(1-d2[2]) + \
+			self.gamma*self.gamma*self.gamma*np.max(self.predict_batch(X_batch_s3, X_extra_s3), 1)*(1-d1)*(1-d2[1])*(1-d2[2])
 
 		X_batch_flip = np.vstack(s1)
 		X_batch_flip = np.asarray(X_batch_flip).reshape(batch_size, STATE_DXY, STATE_DXY)
