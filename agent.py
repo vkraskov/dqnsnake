@@ -4,11 +4,12 @@ import numpy as np
 from collections import deque
 import keras
 from keras.models import Sequential, Model
-from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge
+from keras.layers import Dense, merge, concatenate, add, Input, Multiply, Merge, Lambda
 from keras.optimizers import Adam
 from keras.layers import Dropout, Flatten, Activation
 from keras.layers import Conv2D, MaxPooling2D, Permute
 from keras.initializers import RandomUniform
+from keras import backend as K
 import sys
 
 import tensorflow as tf
@@ -80,12 +81,25 @@ class Agent:
 	#	dense_3_1 = Dense(256, activation='relu')(in3)
 
 	#	joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
-		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
-		dense_f_1 = Dense(256, activation='relu')(joined)
-		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
+
+		joined_1 = keras.layers.Merge()([dense_1_1, dense_2_1])
+		dense_f_1 = Dense(256, activation='relu')(joined_1)
+
+		# streams advantage & value
+		dense_adv_1 = Dense(256, activation='relu')(dense_f_1)
+		dense_val_1 = Dense(256, activation='relu')(dense_f_1)
+
+		dense_adv_2 = Dense(self.action_size, activation='linear')(dense_adv_1)
+		dense_val_2 = Dense(               1, activation='linear')(dense_val_1)
+
+		joined_2 = keras.layers.Lambda(lambda x: x[0]-K.mean(x[0])+x[1], input_shape=(self.action_size,), output_shape=(self.action_size,))([dense_adv_2, dense_val_2])
+
+	#	joined_2 = keras.layers.Merge()([dense_adv_2, dense_val_2], mode = lambda x: x[0]-K.mean(x[0])+x[1])
+		#dense_f_2 = Dense(self.action_size, activation='linear')(joined_2)
 
 	#	model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
-		model = Model(inputs = [in1, in2], outputs = dense_f_2)
+
+		model = Model(inputs = [in1, in2], outputs = joined_2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
