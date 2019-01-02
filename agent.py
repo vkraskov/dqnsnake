@@ -70,22 +70,22 @@ class Agent:
 		flatten_1 = Flatten()(conv2d_1_2)
 		dense_1_1 = Dense(256, activation='relu')(flatten_1)
 
-	#	in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
-	#	conv2d_2_1 = Conv2D(16, (3, 3), activation = 'relu')(in2)
-	#	conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
-	#	flatten_2 = Flatten()(conv2d_2_2)
-	#	dense_2_1 = Dense(256, activation='relu')(flatten_2)
+		in2 = Input(shape=(STATE_CLIP_DXY, STATE_CLIP_DXY, 1))
+		conv2d_2_1 = Conv2D(16, (3, 3), activation = 'relu')(in2)
+		conv2d_2_2 = Conv2D(32, (1, 1), activation = 'relu')(conv2d_2_1)
+		flatten_2 = Flatten()(conv2d_2_2)
+		dense_2_1 = Dense(256, activation='relu')(flatten_2)
 
 	#	in3 = Input(shape=(1,))
 	#	dense_3_1 = Dense(256, activation='relu')(in3)
 
 	#	joined = keras.layers.Merge()([dense_1_1, dense_2_1, dense_3_1])
-	#	dense_f_1 = Dense(256, activation='relu')(joined)
-	#	dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
+		joined = keras.layers.Merge()([dense_1_1, dense_2_1])
+		dense_f_1 = Dense(256, activation='relu')(joined)
+		dense_f_2 = Dense(self.action_size, activation='linear')(dense_f_1)
 
 	#	model = Model(inputs = [in1 , in2, in3], outputs = dense_f_2)
-		dense_f_2 = Dense(self.action_size, activation='linear')(dense_1_1)
-		model = Model(inputs = [in1 , ], outputs = dense_f_2)
+		model = Model(inputs = [in1, in2], outputs = dense_f_2)
                 model.compile(loss='mean_squared_error', optimizer=Adam(lr=self.learning_rate))
 		model.summary()
 
@@ -130,7 +130,7 @@ class Agent:
 		nn_step = (2.*float(score)/self.maxsteps-1)
 		np_step_arr =  np.asarray(nn_step).reshape(1, 1)
 		# predict
-		self.act_values = self.model.predict([np_state, ])
+		self.act_values = self.model.predict([np_state, np_state_clip, ])
 		#if np.argmax(act_values[0]) == ACT_BACK: 
 		#	print act_values, np.argmax(act_values[0]), action2str[np.argmax(act_values[0])]
 		return np.argmax(self.act_values[0])  # returns action
@@ -138,12 +138,12 @@ class Agent:
 	def train_batch(self, X_batch, X_extra, y_batch):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
 		#return self.model.fit([X_batch, X_batch_clip, X_extra], y_batch, epochs=1, verbose=0)
-		return self.model.fit([X_batch, ], y_batch, epochs=1, verbose=0)
+		return self.model.fit([X_batch, X_batch_clip, ], y_batch, epochs=1, verbose=0)
 
 	def predict_batch(self, X_batch, X_extra):
 		X_batch_clip = self.get_state_clip_batch(X_batch, STATE_CLIP_DXY)
 		#return self.model.predict_on_batch([X_batch, X_batch_clip, X_extra])
-		return self.model.predict_on_batch([X_batch, ])
+		return self.model.predict_on_batch([X_batch, X_batch_clip, ])
 
 	def get_state_byid(self, mem_id):
 		return self.sdict[mem_id]
